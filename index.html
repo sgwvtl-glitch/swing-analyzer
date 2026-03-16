@@ -70,15 +70,48 @@
 <body>
 <h1>Fibonacci Swing Analyzer</h1>
 <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
-
 <div class="row">
   <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY"/>
   <button onclick="run()" id="btn">Analyze</button>
 </div>
 <div id="st"></div>
 <div id="res"></div>
-
 <script>
+const PROXIES=[
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+const YH_HOSTS=['query1.finance.yahoo.com','query2.finance.yahoo.com'];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function tryOne(url){
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  const text=await r.text();const t=text.trim();
+  if(!t.startsWith('{')&&!t.startsWith('['))throw new Error('Non-JSON: '+t.slice(0,80));
+  const d=JSON.parse(t);
+  if(d.chart?.error?.description)throw new Error(d.chart.error.description);
+  if(!d.chart?.result?.[0])throw new Error('No chart data returned');
+  return d;
+}
+async function fetchBars(ticker,interval,range,stEl){
+  const qs='/v8/finance/chart/'+ticker+'?interval='+interval+'&range='+range+'&includePrePost=false';
+  let attempt=0,lastErr;
+  for(const host of YH_HOSTS){
+    const base='https://'+host+qs;
+    for(const proxy of PROXIES){
+      attempt++;
+      if(stEl)stEl.textContent='Trying route '+attempt+'/6...';
+      try{
+        const d=await tryOne(proxy(base));
+        const res=d.chart.result[0];const q=res.indicators.quote[0];
+        return res.timestamp.map((t,j)=>({
+          date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]||0
+        })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
+      }catch(e){lastErr=e;await sleep(400);}
+    }
+  }
+  throw new Error('All 6 routes failed: '+lastErr.message);
+}
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
 function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
 function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
@@ -92,30 +125,6 @@ function rsi(closes,n){const g=[],l=[];for(let i=1;i<closes.length;i++){const d=
 function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);const sl=ema(ml,sg);const h=ml.map((v,i)=>v!=null&&sl[i]!=null?v-sl[i]:null);return{ml,sl,h};}
 function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
 function aroon(bars,n){const o=new Array(bars.length).fill(null);for(let i=n;i<bars.length;i++){const sl=bars.slice(i-n,i+1);let hi=0,li=0;for(let j=1;j<=n;j++){if(sl[j].h>=sl[hi].h)hi=j;if(sl[j].l<=sl[li].l)li=j;}o[i]=((hi/n)*100)-((li/n)*100);}return o;}
-
-const PROXIES=[
-  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
-  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-];
-async function fetchBars(ticker,interval,range){
-  const base=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
-  let lastErr;
-  for(const proxy of PROXIES){
-    try{
-      const r=await fetch(proxy(base),{headers:{'Accept':'application/json'}});
-      if(!r.ok)throw new Error(`HTTP ${r.status}`);
-      const d=JSON.parse(await r.text());
-      if(!d.chart?.result?.[0])throw new Error('No data for '+ticker);
-      const res=d.chart.result[0];const q=res.indicators.quote[0];
-      return res.timestamp.map((t,i)=>({
-        date:new Date(t*1000),o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i],v:q.volume[i]??0
-      })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
-    }catch(e){lastErr=e;}
-  }
-  throw new Error('All proxies failed — wait 30s and retry. '+lastErr.message);
-}
-
 function analyze(dBars,hBars,ticker){
   const n=dBars.length,L=n-1;
   const closes=dBars.map(b=>b.c);
@@ -167,9 +176,9 @@ function analyze(dBars,hBars,ticker){
     if(dEFIDir&&hEFIDir!=='n/a'&&dEFIDir!==hEFIDir)flowMixed=true;
   }
   let f1=0,f1r='',f2=0,f2r='',f3=0,f3r='';
-  if(curMFI!=null){if(curMFI>55&&obvSlope==='rising'){f1=1;f1r=`MFI ${curMFI.toFixed(1)} >55 + OBV rising`;}else if(curMFI<45&&obvSlope==='falling'){f1=-1;f1r=`MFI ${curMFI.toFixed(1)} <45 + OBV falling`;}else{f1r=`MFI ${curMFI.toFixed(1)}, OBV ${obvSlope}`;}}
-  if(curH!=null){if(curH>0&&histRising){f2=1;f2r=`Hist +${curH.toFixed(4)} rising`;}else if(curH<0&&!histRising){f2=-1;f2r=`Hist ${curH.toFixed(4)} falling`;}else{f2r=`Hist ${curH.toFixed(4)} mixed`;}}
-  if(curRSI!=null){if(curRSI>55){f3=1;f3r=`RSI ${curRSI.toFixed(1)} >55`;}else if(curRSI<45){f3=-1;f3r=`RSI ${curRSI.toFixed(1)} <45`;}else{f3r=`RSI ${curRSI.toFixed(1)} neutral`;}}
+  if(curMFI!=null){if(curMFI>55&&obvSlope==='rising'){f1=1;f1r='MFI '+curMFI.toFixed(1)+' >55 + OBV rising';}else if(curMFI<45&&obvSlope==='falling'){f1=-1;f1r='MFI '+curMFI.toFixed(1)+' <45 + OBV falling';}else{f1r='MFI '+curMFI.toFixed(1)+', OBV '+obvSlope;}}
+  if(curH!=null){if(curH>0&&histRising){f2=1;f2r='Hist +'+curH.toFixed(4)+' rising';}else if(curH<0&&!histRising){f2=-1;f2r='Hist '+curH.toFixed(4)+' falling';}else{f2r='Hist '+curH.toFixed(4)+' mixed';}}
+  if(curRSI!=null){if(curRSI>55){f3=1;f3r='RSI '+curRSI.toFixed(1)+' >55';}else if(curRSI<45){f3=-1;f3r='RSI '+curRSI.toFixed(1)+' <45';}else{f3r='RSI '+curRSI.toFixed(1)+' neutral';}}
   let score=f1+f2+f3;
   if(flowMixed)score=Math.max(-3,Math.min(3,score-1));
   const haBar=haD[L];
@@ -177,7 +186,7 @@ function analyze(dBars,hBars,ticker){
   const infFlow=haBody>0.618&&a5[L]!=null&&Math.abs(dBars[L].c-dBars[L-1].c)>a5[L];
   if(infFlow)regMult=Math.min(regMult,0.618);
   let signal,sigClass;
-  if(flow!=='CLEAN'){signal=`NO TRADE — ${flow}`;sigClass='sig-none';}
+  if(flow!=='CLEAN'){signal='NO TRADE — '+flow;sigClass='sig-none';}
   else if(score>=2){signal=score===3?'LONG — full position':'LONG — reduced position';sigClass='sig-long';}
   else if(score<=-2){signal=score===-3?'SHORT — full position':'SHORT — reduced position';sigClass='sig-short';}
   else{signal='NO TRADE — wait for alignment';sigClass='sig-none';}
@@ -190,102 +199,91 @@ function analyze(dBars,hBars,ticker){
     signal,sigClass,a5:a5[L],a13:a13[L],bbwState:bbwExp?'expanding':'contracting',
     hHA,hRSI,hOBV,hEFIDir,entryReady,ticker,date:dBars[L].date.toLocaleDateString()};
 }
-
-function b(t,c){return`<span class="badge ${c}">${t}</span>`;}
+function b(t,c){return'<span class="badge '+c+'">'+t+'</span>';}
 function fb(s){return s===1?b('+1','bg'):s===-1?b('-1','br'):b('0','bn');}
 function sb(s){return s>0?b('+'+s,'bg'):s<0?b(s,'br'):b('0','bn');}
-function fmt(v,d=3){return v!=null?Number(v).toFixed(d):'n/a';}
+function fmt(v,d){d=d||3;return v!=null?Number(v).toFixed(d):'n/a';}
 function fmtE(v){return v!=null?Number(v).toExponential(2):'n/a';}
-
 function render(r){
   const regC=r.regime==='Trending up'?'bg':r.regime==='Trending down'?'br':r.regime==='Volatile'?'br':r.regime==='Mean-reverting'?'bw':'bn';
-  const flowC=r.flow==='CLEAN'?'bg':r.flow.includes('TOXIC')?'br':'bw';
+  const flowC=r.flow==='CLEAN'?'bg':r.flow.indexOf('TOXIC')>=0?'br':'bw';
   const entC=r.entryReady?'bg':r.hHA==='n/a'?'bn':'bw';
   const entTxt=r.entryReady?'READY':r.hHA==='n/a'?'NO 1H DATA':'PENDING';
   const infC=r.infFlow?'bw':'bg';
-  document.getElementById('res').innerHTML=`
-<div class="card">
-  <div class="s-title">1 · Regime</div>
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${b(r.regime,regC)}<span style="font-size:12px;color:#888780">${r.regAct}</span></div>
-  <div class="g2">
-    <div><div class="lbl">Aroon Osc(13)</div><div class="val">${fmt(r.curAr,1)}</div></div>
-    <div><div class="lbl">BBW(21)</div><div class="val">${fmt(r.curBBW,4)} <span style="font-size:11px;color:#888780">${r.bbwState}</span></div></div>
-  </div>
-</div>
-<div class="card">
-  <div class="s-title">2 · Toxic flow check (EFI)</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${b(r.flow,flowC)}${r.flowMixed?b('MIXED — 1H contradicts daily','bw'):''}</div>
-  <div class="g3">
-    <div><div class="lbl">EFI(13) current</div><div class="val mono">${fmtE(r.curEFI)}</div></div>
-    <div><div class="lbl">55D mean</div><div class="val mono">${fmtE(r.curMu)}</div></div>
-    <div><div class="lbl">±2σ width</div><div class="val mono">${r.curSig!=null?('±'+fmtE(2*r.curSig)):'n/a'}</div></div>
-  </div>
-</div>
-<div class="card">
-  <div class="s-title">3 · Alpha score</div>
-  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f1r}</span>${fb(r.f1)}</div>
-  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f2r}</span>${fb(r.f2)}</div>
-  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f3r}</span>${fb(r.f3)}</div>
-  <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>${sb(r.score)}${r.flowMixed?'<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>':''}</div>
-</div>
-<div class="sig ${r.sigClass}">
-  <div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div>
-  <div class="sv">${r.signal}</div>
-</div>
-<div class="card">
-  <div class="s-title">4 · Adverse selection</div>
-  <div style="margin-bottom:8px">${b(r.infFlow?'Informed flow — reduce size':'None detected',infC)}</div>
-  <div class="g2">
-    <div><div class="lbl">HA body ratio</div><div class="val">${r.haBody} <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>
-    <div><div class="lbl">ATR(5)</div><div class="val">${fmt(r.a5)}</div></div>
-  </div>
-</div>
-<div class="card">
-  <div class="s-title">5 · Volatility state</div>
-  <div class="g2">
-    <div><div class="lbl">BBW state</div><div class="val">${r.bbwState}</div></div>
-    <div><div class="lbl">ATR(13)</div><div class="val">${fmt(r.a13)}</div></div>
-  </div>
-  <div style="margin-top:8px;font-size:12px;color:#888780">Switch to static ATR at day 8 of hold</div>
-</div>
-<div class="card">
-  <div class="s-title">6 · Position size</div>
-  <div class="sz-box">Size = (Account × 0.01) ÷ ${fmt(r.a13)} × ${r.regMult}<br><span style="font-size:11px;color:#888780">Kelly γ 0.382 · regime multiplier ${r.regMult}</span></div>
-</div>
-<div class="card">
-  <div class="s-title">7 · 1H entry timing</div>
-  <div style="margin-bottom:8px">${b(entTxt,entC)}</div>
-  <div class="g2">
-    <div><div class="lbl">1H HA color</div><div class="val">${r.hHA}</div></div>
-    <div><div class="lbl">1H RSI(8)</div><div class="val">${r.hRSI!=null?r.hRSI.toFixed(1):'n/a'}</div></div>
-    <div><div class="lbl">1H OBV slope</div><div class="val">${r.hOBV}</div></div>
-    <div><div class="lbl">1H EFI direction</div><div class="val">${r.hEFIDir}</div></div>
-  </div>
-</div>`;
+  const sigW=r.curSig!=null?'&plusmn;'+fmtE(2*r.curSig):'n/a';
+  document.getElementById('res').innerHTML=
+'<div class="card"><div class="s-title">1 &middot; Regime</div>'+
+'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+b(r.regime,regC)+'<span style="font-size:12px;color:#888780">'+r.regAct+'</span></div>'+
+'<div class="g2"><div><div class="lbl">Aroon Osc(13)</div><div class="val">'+fmt(r.curAr,1)+'</div></div>'+
+'<div><div class="lbl">BBW(21)</div><div class="val">'+fmt(r.curBBW,4)+' <span style="font-size:11px;color:#888780">'+r.bbwState+'</span></div></div></div></div>'+
+'<div class="card"><div class="s-title">2 &middot; Toxic flow check (EFI)</div>'+
+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.flow,flowC)+(r.flowMixed?b('MIXED &mdash; 1H contradicts daily','bw'):'')+'</div>'+
+'<div class="g3"><div><div class="lbl">EFI(13) current</div><div class="val mono">'+fmtE(r.curEFI)+'</div></div>'+
+'<div><div class="lbl">55D mean</div><div class="val mono">'+fmtE(r.curMu)+'</div></div>'+
+'<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">'+sigW+'</div></div></div></div>'+
+'<div class="card"><div class="s-title">3 &middot; Alpha score</div>'+
+'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f1r+'</span>'+fb(r.f1)+'</div>'+
+'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f2r+'</span>'+fb(r.f2)+'</div>'+
+'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f3r+'</span>'+fb(r.f3)+'</div>'+
+'<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>'+sb(r.score)+(r.flowMixed?'<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>':'')+'</div></div>'+
+'<div class="sig '+r.sigClass+'"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">'+r.signal+'</div></div>'+
+'<div class="card"><div class="s-title">4 &middot; Adverse selection</div>'+
+'<div style="margin-bottom:8px">'+b(r.infFlow?'Informed flow &mdash; reduce size':'None detected',infC)+'</div>'+
+'<div class="g2"><div><div class="lbl">HA body ratio</div><div class="val">'+r.haBody+' <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>'+
+'<div><div class="lbl">ATR(5)</div><div class="val">'+fmt(r.a5)+'</div></div></div></div>'+
+'<div class="card"><div class="s-title">5 &middot; Volatility state</div>'+
+'<div class="g2"><div><div class="lbl">BBW state</div><div class="val">'+r.bbwState+'</div></div>'+
+'<div><div class="lbl">ATR(13)</div><div class="val">'+fmt(r.a13)+'</div></div></div>'+
+'<div style="margin-top:8px;font-size:12px;color:#888780">Switch to static ATR at day 8 of hold</div></div>'+
+'<div class="card"><div class="s-title">6 &middot; Position size</div>'+
+'<div class="sz-box">Size = (Account &times; 0.01) &divide; '+fmt(r.a13)+' &times; '+r.regMult+'<br><span style="font-size:11px;color:#888780">Kelly &gamma; 0.382 &middot; regime multiplier '+r.regMult+'</span></div></div>'+
+'<div class="card"><div class="s-title">7 &middot; 1H entry timing</div>'+
+'<div style="margin-bottom:8px">'+b(entTxt,entC)+'</div>'+
+'<div class="g2"><div><div class="lbl">1H HA color</div><div class="val">'+r.hHA+'</div></div>'+
+'<div><div class="lbl">1H RSI(8)</div><div class="val">'+(r.hRSI!=null?r.hRSI.toFixed(1):'n/a')+'</div></div>'+
+'<div><div class="lbl">1H OBV slope</div><div class="val">'+r.hOBV+'</div></div>'+
+'<div><div class="lbl">1H EFI direction</div><div class="val">'+r.hEFIDir+'</div></div></div></div>';
 }
-
+let retryTimer=null;
+function clearRetry(){if(retryTimer){clearInterval(retryTimer);retryTimer=null;}}
+function startRetryCountdown(tk,secs){
+  var res=document.getElementById('res');
+  var t=secs;
+  res.innerHTML='<div id="retry-box" style="font-size:13px;padding:.75rem 0;color:#5f5e5a">Rate limited — auto-retrying in <span id="cd">'+t+'</span>s... <button onclick="clearRetry();run()" style="margin-left:8px;font-size:12px;padding:4px 10px">Retry now</button></div>';
+  retryTimer=setInterval(function(){
+    t--;
+    var el=document.getElementById('cd');
+    if(el)el.textContent=t;
+    if(t<=0){clearRetry();run();}
+  },1000);
+}
 async function run(){
-  const tk=document.getElementById('tk').value.trim().toUpperCase();
+  clearRetry();
+  var tk=document.getElementById('tk').value.trim().toUpperCase();
   if(!tk)return;
-  const st=document.getElementById('st'),res=document.getElementById('res'),btn=document.getElementById('btn');
+  var st=document.getElementById('st'),res=document.getElementById('res'),btn=document.getElementById('btn');
   res.innerHTML='';btn.disabled=true;
   try{
     st.textContent='Fetching daily data...';
-    const daily=await fetchBars(tk,'1d','6mo');
+    var daily=await fetchBars(tk,'1d','6mo',st);
     if(daily.length<60)throw new Error('Not enough history (need 60+ days)');
     st.textContent='Fetching 1-hour data...';
-    let hourly=null;
-    try{hourly=await fetchBars(tk,'1h','5d');}catch(e){}
+    var hourly=null;
+    try{hourly=await fetchBars(tk,'1h','5d',null);}catch(e){}
     st.textContent='Calculating indicators...';
-    const r=analyze(daily,hourly,tk);
-    st.textContent=`${tk} · as of ${r.date} · ${daily.length} daily bars`;
+    var r=analyze(daily,hourly,tk);
+    st.textContent=tk+' · as of '+r.date+' · '+daily.length+' daily bars';
     render(r);
   }catch(e){
     st.textContent='';
-    res.innerHTML=`<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">Error: ${e.message}</div>`;
+    if(e.message.indexOf('routes failed')>=0||e.message.indexOf('Non-JSON')>=0||e.message.indexOf('Too Many')>=0){
+      startRetryCountdown(tk,30);
+    }else{
+      res.innerHTML='<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">Error: '+e.message+'</div>';
+    }
   }finally{btn.disabled=false;}
 }
-document.getElementById('tk').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+document.getElementById('tk').addEventListener('keydown',function(e){if(e.key==='Enter')run();});
 </script>
 </body>
 </html>
