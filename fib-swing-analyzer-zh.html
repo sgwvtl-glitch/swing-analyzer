@@ -84,22 +84,32 @@ const PROXIES=[
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
   u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
 ];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function tryProxy(proxyUrl){
+  const r=await fetch(proxyUrl,{headers:{'Accept':'application/json'}});
+  const text=await r.text();
+  const trimmed=text.trim();
+  if(!trimmed.startsWith('{')&&!trimmed.startsWith('['))
+    throw new Error('代理返回非JSON内容: '+trimmed.slice(0,60));
+  const d=JSON.parse(trimmed);
+  if(d.chart?.error?.description)throw new Error(d.chart.error.description);
+  if(!d.chart?.result?.[0])throw new Error('未返回图表数据');
+  return d;
+}
 async function fetchBars(ticker,interval,range){
   const base=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
   let lastErr;
-  for(const proxy of PROXIES){
+  for(let i=0;i<PROXIES.length;i++){
+    if(i>0)await sleep(800);
     try{
-      const r=await fetch(proxy(base),{headers:{'Accept':'application/json'}});
-      if(!r.ok)throw new Error(`HTTP ${r.status}`);
-      const d=JSON.parse(await r.text());
-      if(!d.chart?.result?.[0])throw new Error('未找到数据：'+ticker);
+      const d=await tryProxy(PROXIES[i](base));
       const res=d.chart.result[0];const q=res.indicators.quote[0];
-      return res.timestamp.map((t,i)=>({
-        date:new Date(t*1000),o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i],v:q.volume[i]??0
+      return res.timestamp.map((t,j)=>({
+        date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]??0
       })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
     }catch(e){lastErr=e;}
   }
-  throw new Error('所有代理均失败，请等待30秒后重试。'+lastErr.message);
+  throw new Error('三个代理均失败。'+lastErr.message);
 }
 
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
@@ -259,28 +269,46 @@ function render(r,ticker){
 </div>`;
 }
 
+let retryTimer=null;
+function clearRetry(){if(retryTimer){clearInterval(retryTimer);retryTimer=null;}}
+function startRetryCountdown(ticker,secs){
+  const res=document.getElementById('res');
+  let t=secs;
+  res.innerHTML=`<div id="retry-box" style="font-size:13px;padding:.75rem 0;color:#5f5e5a">
+    数据获取受限，<span id="cd">${t}</span> 秒后自动重试...
+    <button onclick="clearRetry();run()" style="margin-left:8px;font-size:12px;padding:4px 10px">立即重试</button>
+  </div>`;
+  retryTimer=setInterval(()=>{
+    t--;
+    const el=document.getElementById('cd');
+    if(el)el.textContent=t;
+    if(t<=0){clearRetry();run();}
+  },1000);
+}
 async function run(){
+  clearRetry();
   const ticker=document.getElementById('tk').value.trim().toUpperCase();
   if(!ticker)return;
   const st=document.getElementById('st'),res=document.getElementById('res'),btn=document.getElementById('btn');
   res.innerHTML='';btn.disabled=true;
   try{
     st.textContent='正在获取日线数据...';
-    const daily=await fetchBars(ticker,'1d','6mo');
+    const daily=await fetchBars(ticker,'1d','6mo',st);
     if(daily.length<60)throw new Error('历史数据不足（需要至少60个交易日）');
     st.textContent='正在获取1小时数据...';
     let hourly=null;
-    try{hourly=await fetchBars(ticker,'1h','5d');}catch(e){}
+    try{hourly=await fetchBars(ticker,'1h','5d',null);}catch(e){}
     st.textContent='正在计算指标...';
     const r=analyze(daily,hourly);
     st.textContent=`${ticker} · ${r.date} · ${daily.length} 个交易日`;
     render(r,ticker);
   }catch(e){
     st.textContent='';
-    res.innerHTML=`<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">
-      <strong>错误：</strong>${e.message}<br>
-      <span style="color:#5f5e5a;font-size:12px;margin-top:4px;display:block">三个代理均已尝试，请等待30秒后重试。</span>
-    </div>`;
+    if(e.message.includes('均失败')||e.message.includes('非JSON')||e.message.includes('Too Many')){
+      startRetryCountdown(ticker,30);
+    }else{
+      res.innerHTML=`<div style="color:#a32d2d;font-size:13px;padding:.5rem 0"><strong>错误：</strong>${e.message}</div>`;
+    }
   }finally{btn.disabled=false;}
 }
 document.getElementById('tk').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
