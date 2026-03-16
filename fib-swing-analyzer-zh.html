@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>斐波那契波段分析器</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a18;padding:1.5rem;max-width:720px;margin:0 auto}
+  h1{font-size:18px;font-weight:500;margin-bottom:4px}
+  .sub{font-size:12px;color:#888780;margin-bottom:1.25rem}
+  input[type=text]{font-size:14px;padding:8px 12px;border:1px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;width:220px;outline:none}
+  input[type=text]:focus{border-color:#888780}
+  button{font-size:13px;padding:8px 16px;border:1px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;cursor:pointer}
+  button:hover{background:#f1efe8}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .card{background:#fff;border:1px solid #e8e6df;border-radius:12px;padding:1rem 1.25rem;margin-bottom:10px}
+  .s-title{font-size:11px;font-weight:500;color:#888780;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+  .lbl{font-size:12px;color:#5f5e5a;margin-bottom:3px}
+  .val{font-size:15px;font-weight:500;color:#1a1a18}
+  .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+  .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500}
+  .bg{background:#eaf3de;color:#27500a}
+  .br{background:#fcebeb;color:#791f1f}
+  .bw{background:#faeeda;color:#633806}
+  .bi{background:#e6f1fb;color:#0c447c}
+  .bn{background:#f1efe8;color:#444441}
+  .frow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1efe8}
+  .frow:last-child{border-bottom:none}
+  .sig{text-align:center;padding:1.25rem;border-radius:12px;margin-bottom:10px}
+  .sig-long{background:#eaf3de}
+  .sig-short{background:#fcebeb}
+  .sig-none{background:#f1efe8}
+  .sig-long .sv{color:#27500a}
+  .sig-short .sv{color:#791f1f}
+  .sig-none .sv{color:#444441}
+  .sv{font-size:22px;font-weight:500}
+  .mono{font-family:'Menlo','Monaco','Courier New',monospace;font-size:12px}
+  .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  #st{font-size:13px;color:#5f5e5a;min-height:18px;margin-bottom:8px}
+  .sz-box{padding:10px;background:#f5f5f0;border-radius:8px;font-size:13px;line-height:1.6}
+  @media(prefers-color-scheme:dark){
+    body{background:#1e1e1c;color:#e8e6df}
+    .card{background:#2c2c2a;border-color:#444441}
+    input[type=text]{background:#2c2c2a;color:#e8e6df;border-color:#444441}
+    input[type=text]:focus{border-color:#888780}
+    button{background:#2c2c2a;color:#e8e6df;border-color:#444441}
+    button:hover{background:#3a3a38}
+    .lbl{color:#b4b2a9}
+    .val{color:#e8e6df}
+    .frow{border-color:#3a3a38}
+    .s-title{color:#888780}
+    .bg{background:#173404;color:#c0dd97}
+    .br{background:#501313;color:#f09595}
+    .bw{background:#412402;color:#fac775}
+    .bi{background:#042c53;color:#85b7eb}
+    .bn{background:#3a3a38;color:#b4b2a9}
+    .sig-long{background:#173404}
+    .sig-short{background:#501313}
+    .sig-none{background:#3a3a38}
+    .sig-long .sv{color:#c0dd97}
+    .sig-short .sv{color:#f09595}
+    .sig-none .sv{color:#b4b2a9}
+    .sz-box{background:#3a3a38}
+    #st{color:#888780}
+  }
+</style>
+</head>
+<body>
+<h1>斐波那契波段分析器</h1>
+<div class="sub">实时数据 · 日线 + 1小时 Heikin Ashi · 全斐波那契参数 · 持仓周期 2天至2周</div>
+
+<div class="row">
+  <input id="tk" type="text" placeholder="股票代码 — 如 AAPL、TSLA、SPY"/>
+  <button onclick="run()" id="btn">分析</button>
+</div>
+<div id="st"></div>
+<div id="res"></div>
+
+<script>
+const PROXIES=[
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+async function fetchBars(ticker,interval,range){
+  const base=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
+  let lastErr;
+  for(const proxy of PROXIES){
+    try{
+      const r=await fetch(proxy(base),{headers:{'Accept':'application/json'}});
+      if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      const d=JSON.parse(await r.text());
+      if(!d.chart?.result?.[0])throw new Error('未找到数据：'+ticker);
+      const res=d.chart.result[0];const q=res.indicators.quote[0];
+      return res.timestamp.map((t,i)=>({
+        date:new Date(t*1000),o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i],v:q.volume[i]??0
+      })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
+    }catch(e){lastErr=e;}
+  }
+  throw new Error('所有代理均失败，请等待30秒后重试。'+lastErr.message);
+}
+
+function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
+function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
+function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
+function rStd(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){const sl=a.slice(i-n+1,i+1).filter(x=>x!=null);if(sl.length<n)continue;const m=sl.reduce((a,b)=>a+b,0)/sl.length;o[i]=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/sl.length);}return o;}
+function ha(bars){const r=[];for(let i=0;i<bars.length;i++){const b=bars[i];const hc=(b.o+b.h+b.l+b.c)/4;const ho=i===0?(b.o+b.c)/2:(r[i-1].ho+r[i-1].hc)/2;r.push({...b,ho,hh:Math.max(b.h,ho,hc),hl:Math.min(b.l,ho,hc),hc});}return r;}
+function atr(bars,n){const tr=bars.map((b,i)=>{if(i===0)return b.h-b.l;const p=bars[i-1].c;return Math.max(b.h-b.l,Math.abs(b.h-p),Math.abs(b.l-p));});return wilder(tr,n);}
+function mfi(bars,n){const o=new Array(bars.length).fill(null);for(let i=n;i<bars.length;i++){let pf=0,nf=0;for(let j=i-n+1;j<=i;j++){const tp=(bars[j].h+bars[j].l+bars[j].c)/3,pt=(bars[j-1].h+bars[j-1].l+bars[j-1].c)/3;const rmf=tp*bars[j].v;if(tp>=pt)pf+=rmf;else nf+=rmf;}o[i]=nf===0?100:100-100/(1+pf/nf);}return o;}
+function obv(bars){const o=new Array(bars.length).fill(0);for(let i=1;i<bars.length;i++){if(bars[i].c>bars[i-1].c)o[i]=o[i-1]+bars[i].v;else if(bars[i].c<bars[i-1].c)o[i]=o[i-1]-bars[i].v;else o[i]=o[i-1];}return o;}
+function efi(bars,en,sn){const raw=bars.map((b,i)=>i===0?0:(b.c-bars[i-1].c)*b.v);const e=ema(raw,en);const mu=sma(e,sn);const sig=rStd(e,sn);return{e,mu,sig};}
+function rsi(closes,n){const g=[],l=[];for(let i=1;i<closes.length;i++){const d=closes[i]-closes[i-1];g.push(Math.max(d,0));l.push(Math.max(-d,0));}const ag=wilder(g,n),al=wilder(l,n);const o=[null];for(let i=0;i<ag.length;i++){if(ag[i]==null){o.push(null);continue;}o.push(al[i]===0?100:100-100/(1+ag[i]/al[i]));}return o;}
+function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);const sl=ema(ml,sg);const h=ml.map((v,i)=>v!=null&&sl[i]!=null?v-sl[i]:null);return{ml,sl,h};}
+function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
+function aroon(bars,n){const o=new Array(bars.length).fill(null);for(let i=n;i<bars.length;i++){const sl=bars.slice(i-n,i+1);let hi=0,li=0;for(let j=1;j<=n;j++){if(sl[j].h>=sl[hi].h)hi=j;if(sl[j].l<=sl[li].l)li=j;}o[i]=((hi/n)*100)-((li/n)*100);}return o;}
+
+function analyze(dBars,hBars){
+  const L=dBars.length-1;
+  const closes=dBars.map(b=>b.c);
+  const haD=ha(dBars);
+  const a5=atr(dBars,5),a13=atr(dBars,13);
+  const m13=mfi(dBars,13);
+  const ob=obv(dBars);
+  const{e:efiV,mu:efiMu,sig:efiSig}=efi(dBars,13,55);
+  const r8=rsi(closes,8);
+  const{h:mH}=macd(closes,13,21,8);
+  const bw=bbw(closes,21);
+  const ar=aroon(dBars,13);
+  const obvSlope=ob[L]>ob[L-3]?'上升':ob[L]<ob[L-3]?'下降':'平稳';
+  const curBBW=bw[L],prvBBW=bw[L-1];
+  const bbwExp=curBBW!=null&&prvBBW!=null&&curBBW>prvBBW;
+  const bbw21Max=Math.max(...bw.slice(Math.max(0,L-21),L).filter(x=>x!=null));
+  const curAr=ar[L],curEFI=efiV[L],curMu=efiMu[L],curSig=efiSig[L];
+  const curMFI=m13[L],curRSI=r8[L],curH=mH[L],prvH=mH[L-1];
+  const histRising=curH!=null&&prvH!=null&&curH>prvH;
+  let regime,regAct,regMult=1.0;
+  if(curBBW!=null&&curBBW>bbw21Max){regime='高波动';regAct='缩仓至0.191凯利';regMult=0.382;}
+  else if(curAr!=null&&curAr>50){regime='上升趋势';regAct='顺势做多，跟随HA';regMult=1.0;}
+  else if(curAr!=null&&curAr<-50){regime='下降趋势';regAct='顺势做空，跟随HA';regMult=1.0;}
+  else if(curAr!=null&&Math.abs(curAr)<=21&&!bbwExp){regime='震荡市';regAct='逆势操作，反向做单';regMult=0.618;}
+  else{regime='过渡期';regAct='缩仓至0.618，不逆势';regMult=0.618;}
+  let flow='正常';
+  let flowRaw='CLEAN';
+  if(curEFI!=null&&curMu!=null&&curSig!=null){
+    if(curEFI>curMu+2*curSig){flow='毒性买压';flowRaw='TOXIC';}
+    else if(curEFI<curMu-2*curSig){flow='毒性卖压';flowRaw='TOXIC';}
+  }
+  let hHA='无数据',hRSI=null,hOBV='无数据',hEFIDir='无数据',flowMixed=false;
+  if(hBars&&hBars.length>20){
+    const hN=hBars.length-1;
+    const haH=ha(hBars);
+    hHA=haH[hN].hc>=haH[hN].ho?'看涨（绿）':'看跌（红）';
+    const hR=rsi(hBars.map(b=>b.c),8);
+    hRSI=hR[hN];
+    const hO=obv(hBars);
+    hOBV=hO[hN]>hO[hN-3]?'上升':hO[hN]<hO[hN-3]?'下降':'平稳';
+    const hSigN=Math.min(55,hBars.length-14);
+    if(hSigN>5){const{e:hEFIV}=efi(hBars,13,hSigN);const hEC=hEFIV[hN],hEP=hEFIV[hN-1];if(hEC!=null&&hEP!=null)hEFIDir=hEC>hEP?'上升':'下降';}
+    const dEFIPrev=efiV[L-1];
+    const dEFIDir=curEFI!=null&&dEFIPrev!=null?(curEFI>dEFIPrev?'上升':'下降'):null;
+    if(dEFIDir&&hEFIDir!=='无数据'&&dEFIDir!==hEFIDir)flowMixed=true;
+  }
+  let f1=0,f1r='',f2=0,f2r='',f3=0,f3r='';
+  if(curMFI!=null){if(curMFI>55&&obvSlope==='上升'){f1=1;f1r=`MFI ${curMFI.toFixed(1)} >55 + OBV上升`;}else if(curMFI<45&&obvSlope==='下降'){f1=-1;f1r=`MFI ${curMFI.toFixed(1)} <45 + OBV下降`;}else f1r=`MFI ${curMFI.toFixed(1)}，OBV ${obvSlope}`;}
+  if(curH!=null){if(curH>0&&histRising){f2=1;f2r=`柱状 +${curH.toFixed(4)} 上升`;}else if(curH<0&&!histRising){f2=-1;f2r=`柱状 ${curH.toFixed(4)} 下降`;}else f2r=`柱状 ${curH.toFixed(4)} 混合`;}
+  if(curRSI!=null){if(curRSI>55){f3=1;f3r=`RSI ${curRSI.toFixed(1)} >55`;}else if(curRSI<45){f3=-1;f3r=`RSI ${curRSI.toFixed(1)} <45`;}else f3r=`RSI ${curRSI.toFixed(1)} 中性`;}
+  let score=f1+f2+f3;
+  if(flowMixed)score=Math.max(-3,Math.min(3,score-1));
+  const haBar=haD[L];
+  const haBody=haBar?Math.abs(haBar.hc-haBar.ho)/(haBar.hh-haBar.hl||0.0001):0;
+  const infFlow=haBody>0.618&&a5[L]!=null&&Math.abs(dBars[L].c-dBars[L-1].c)>a5[L];
+  if(infFlow)regMult=Math.min(regMult,0.618);
+  let signal,sigClass;
+  if(flowRaw==='TOXIC'){signal=`不宜入场 — ${flow}`;sigClass='sig-none';}
+  else if(score>=2){signal=score===3?'做多 — 满仓':'做多 — 减仓';sigClass='sig-long';}
+  else if(score<=-2){signal=score===-3?'做空 — 满仓':'做空 — 减仓';sigClass='sig-short';}
+  else{signal='观望 — 等待信号对齐';sigClass='sig-none';}
+  const aligned=(signal.includes('做多')&&hHA.includes('看涨'))||(signal.includes('做空')&&hHA.includes('看跌'));
+  const rsiOK=(signal.includes('做多')&&hRSI!=null&&hRSI>55)||(signal.includes('做空')&&hRSI!=null&&hRSI<45);
+  const obvOK=(signal.includes('做多')&&hOBV==='上升')||(signal.includes('做空')&&hOBV==='下降');
+  return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowRaw,flowMixed,curEFI,curMu,curSig,
+    f1,f1r,f2,f2r,f3,f3r,score,infFlow,haBody:haBody.toFixed(3),signal,sigClass,
+    a5:a5[L],a13:a13[L],bbwState:bbwExp?'扩张':'收缩',
+    hHA,hRSI,hOBV,hEFIDir,entryReady:aligned&&rsiOK&&obvOK,
+    date:dBars[L].date.toLocaleDateString('zh-CN')};
+}
+
+const b=(t,c)=>`<span class="badge ${c}">${t}</span>`;
+const fb=s=>s===1?b('+1','bg'):s===-1?b('-1','br'):b('0','bn');
+const sb=s=>s>0?b('+'+s,'bg'):s<0?b(s,'br'):b('0','bn');
+const fmt=(v,d=3)=>v!=null?Number(v).toFixed(d):'无数据';
+const fmtE=v=>v!=null?Number(v).toExponential(2):'无数据';
+
+function render(r,ticker){
+  const regC=r.regime==='上升趋势'?'bg':r.regime==='下降趋势'?'br':r.regime==='高波动'?'br':r.regime==='震荡市'?'bw':'bn';
+  const flowC=r.flowRaw==='CLEAN'?'bg':'br';
+  const entC=r.entryReady?'bg':r.hHA==='无数据'?'bn':'bw';
+  const entTxt=r.entryReady?'可入场':r.hHA==='无数据'?'无1小时数据':'等待确认';
+  document.getElementById('res').innerHTML=`
+<div class="card">
+  <div class="s-title">第一步 · 市场状态</div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${b(r.regime,regC)}<span style="font-size:12px;color:#888780">${r.regAct}</span></div>
+  <div class="g2">
+    <div><div class="lbl">阿隆震荡指标(13)</div><div class="val">${fmt(r.curAr,1)}</div></div>
+    <div><div class="lbl">布林带宽度BBW(21)</div><div class="val">${fmt(r.curBBW,4)} <span style="font-size:11px;color:#888780">${r.bbwState}</span></div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="s-title">第二步 · 毒性资金流检测（EFI）</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${b(r.flow,flowC)}${r.flowMixed?b('混合信号 — 1小时与日线矛盾','bw'):''}</div>
+  <div class="g3">
+    <div><div class="lbl">EFI(13) 当前值</div><div class="val mono">${fmtE(r.curEFI)}</div></div>
+    <div><div class="lbl">55日均值</div><div class="val mono">${fmtE(r.curMu)}</div></div>
+    <div><div class="lbl">±2σ 范围</div><div class="val mono">${r.curSig!=null?'±'+fmtE(2*r.curSig):'无数据'}</div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="s-title">第三步 · 综合评分</div>
+  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:130px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f1r}</span>${fb(r.f1)}</div>
+  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:130px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f2r}</span>${fb(r.f2)}</div>
+  <div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:130px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">${r.f3r}</span>${fb(r.f3)}</div>
+  <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">总分</span>${sb(r.score)}${r.flowMixed?'<span style="font-size:11px;color:#854f0b">（混合信号扣1分）</span>':''}</div>
+</div>
+<div class="sig ${r.sigClass}">
+  <div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">交易信号</div>
+  <div class="sv">${r.signal}</div>
+</div>
+<div class="card">
+  <div class="s-title">第四步 · 逆向选择检测</div>
+  <div style="margin-bottom:8px">${b(r.infFlow?'检测到知情交易 — 缩减仓位':'未检测到异常',r.infFlow?'bw':'bg')}</div>
+  <div class="g2">
+    <div><div class="lbl">HA实体比率</div><div class="val">${r.haBody} <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>
+    <div><div class="lbl">ATR(5)</div><div class="val">${fmt(r.a5)}</div></div>
+  </div>
+</div>
+<div class="card">
+  <div class="s-title">第五步 · 波动状态</div>
+  <div class="g2">
+    <div><div class="lbl">布林带宽度状态</div><div class="val">${r.bbwState}</div></div>
+    <div><div class="lbl">ATR(13)</div><div class="val">${fmt(r.a13)}</div></div>
+  </div>
+  <div style="margin-top:8px;font-size:12px;color:#888780">持仓满第8天后改用入场时的静态ATR</div>
+</div>
+<div class="card">
+  <div class="s-title">第六步 · 仓位计算</div>
+  <div class="sz-box">仓位 = （账户资金 × 0.01）÷ ${fmt(r.a13)} × ${r.regMult}<br><span style="font-size:11px;color:#888780">凯利系数 γ = 0.382 · 市场状态乘数 ${r.regMult}</span></div>
+</div>
+<div class="card">
+  <div class="s-title">第七步 · 1小时入场时机</div>
+  <div style="margin-bottom:8px">${b(entTxt,entC)}</div>
+  <div class="g2">
+    <div><div class="lbl">1小时 HA 方向</div><div class="val">${r.hHA}</div></div>
+    <div><div class="lbl">1小时 RSI(8)</div><div class="val">${r.hRSI!=null?r.hRSI.toFixed(1):'无数据'}</div></div>
+    <div><div class="lbl">1小时 OBV 趋势</div><div class="val">${r.hOBV}</div></div>
+    <div><div class="lbl">1小时 EFI 方向</div><div class="val">${r.hEFIDir}</div></div>
+  </div>
+</div>`;
+}
+
+async function run(){
+  const ticker=document.getElementById('tk').value.trim().toUpperCase();
+  if(!ticker)return;
+  const st=document.getElementById('st'),res=document.getElementById('res'),btn=document.getElementById('btn');
+  res.innerHTML='';btn.disabled=true;
+  try{
+    st.textContent='正在获取日线数据...';
+    const daily=await fetchBars(ticker,'1d','6mo');
+    if(daily.length<60)throw new Error('历史数据不足（需要至少60个交易日）');
+    st.textContent='正在获取1小时数据...';
+    let hourly=null;
+    try{hourly=await fetchBars(ticker,'1h','5d');}catch(e){}
+    st.textContent='正在计算指标...';
+    const r=analyze(daily,hourly);
+    st.textContent=`${ticker} · ${r.date} · ${daily.length} 个交易日`;
+    render(r,ticker);
+  }catch(e){
+    st.textContent='';
+    res.innerHTML=`<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">
+      <strong>错误：</strong>${e.message}<br>
+      <span style="color:#5f5e5a;font-size:12px;margin-top:4px;display:block">三个代理均已尝试，请等待30秒后重试。</span>
+    </div>`;
+  }finally{btn.disabled=false;}
+}
+document.getElementById('tk').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+</script>
+</body>
+</html>
