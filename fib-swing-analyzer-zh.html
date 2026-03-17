@@ -79,37 +79,61 @@
 <div id="res"></div>
 
 <script>
+const TD_KEY='934f233f1c934c92a767bb9e52191d6d';
 const PROXIES=[
   u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
 ];
+const YH_HOSTS=['query1.finance.yahoo.com','query2.finance.yahoo.com'];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function tryProxy(proxyUrl){
-  const r=await fetch(proxyUrl,{headers:{'Accept':'application/json'}});
-  const text=await r.text();
-  const trimmed=text.trim();
-  if(!trimmed.startsWith('{')&&!trimmed.startsWith('['))
-    throw new Error('代理返回非JSON内容: '+trimmed.slice(0,60));
-  const d=JSON.parse(trimmed);
-  if(d.chart?.error?.description)throw new Error(d.chart.error.description);
-  if(!d.chart?.result?.[0])throw new Error('未返回图表数据');
-  return d;
+
+async function fetchTD(ticker,interval,outputsize){
+  const ivMap={'1d':'1day','1h':'1h'};
+  const url=`https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${ivMap[interval]}&outputsize=${outputsize}&apikey=${TD_KEY}`;
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  const d=await r.json();
+  if(d.status==='error')throw new Error('Twelve Data: '+d.message);
+  if(!d.values||!d.values.length)throw new Error('Twelve Data: no values returned');
+  return d.values.slice().reverse().map(v=>({
+    date:new Date(v.datetime),
+    o:parseFloat(v.open),h:parseFloat(v.high),
+    l:parseFloat(v.low),c:parseFloat(v.close),
+    v:parseInt(v.volume)||0
+  })).filter(b=>!isNaN(b.c));
 }
-async function fetchBars(ticker,interval,range){
-  const base=`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
-  let lastErr;
-  for(let i=0;i<PROXIES.length;i++){
-    if(i>0)await sleep(800);
-    try{
-      const d=await tryProxy(PROXIES[i](base));
-      const res=d.chart.result[0];const q=res.indicators.quote[0];
-      return res.timestamp.map((t,j)=>({
-        date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]??0
-      })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
-    }catch(e){lastErr=e;}
+
+async function tryYH(url){
+  const t=(await(await fetch(url,{headers:{'Accept':'application/json'}})).text()).trim();
+  if(!t.startsWith('{')&&!t.startsWith('['))throw new Error('Non-JSON: '+t.slice(0,60));
+  const d=JSON.parse(t);
+  if(d.chart?.error?.description)throw new Error(d.chart.error.description);
+  if(!d.chart?.result?.[0])throw new Error('No data');
+  const res=d.chart.result[0];const q=res.indicators.quote[0];
+  return res.timestamp.map((t,j)=>({
+    date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]||0
+  })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
+}
+
+async function fetchBars(ticker,interval,range,stEl){
+  if(stEl)stEl.textContent='正在从 Twelve Data 获取数据...';
+  try{
+    const size=interval==='1d'?130:120;
+    return await fetchTD(ticker,interval,size);
+  }catch(e){
+    if(stEl)stEl.textContent='Twelve Data 失败，尝试备用线路...';
+    await sleep(300);
   }
-  throw new Error('三个代理均失败。'+lastErr.message);
+  const qs=`/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
+  let attempt=0,lastErr;
+  for(const host of YH_HOSTS){
+    for(const proxy of PROXIES){
+      attempt++;
+      if(stEl)stEl.textContent=`Fallback route ${attempt}/4...`;
+      try{return await tryYH(proxy('https://'+host+qs));}
+      catch(e){lastErr=e;await sleep(400);}
+    }
+  }
+  throw new Error('所有线路均失败：'+lastErr.message);
 }
 
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
