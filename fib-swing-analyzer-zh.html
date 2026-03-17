@@ -40,6 +40,7 @@
   .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   #st{font-size:13px;color:#5f5e5a;min-height:18px;margin-bottom:8px}
   .sz-box{padding:10px;background:#f5f5f0;border-radius:8px;font-size:13px;line-height:1.6}
+  #timer-bar{background:#2c2c2a!important;border-color:#444441!important;color:#b4b2a9!important}
   @media(prefers-color-scheme:dark){
     body{background:#1e1e1c;color:#e8e6df}
     .card{background:#2c2c2a;border-color:#444441}
@@ -74,6 +75,19 @@
 <div class="row">
   <input id="tk" type="text" placeholder="股票代码 — 如 AAPL、TSLA、SPY"/>
   <button onclick="run()" id="btn">分析</button>
+  <button onclick="toggleAuto()" id="autobtn" style="background:#eaf3de;border-color:#3b6d11;color:#27500a">自动 关</button>
+</div>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:#888780">
+  <span>每隔</span>
+  <select id="interval-sel" style="font-size:12px;padding:3px 6px;border:1px solid #d3d1c7;border-radius:6px;background:#fff;color:#1a1a18">
+    <option value="1">1 分钟</option>
+    <option value="5" selected>5 分钟</option>
+    <option value="10">10 分钟</option>
+    <option value="15">15 分钟</option>
+    <option value="30">30 分钟</option>
+  </select>
+  <span>刷新一次</span>
+  <span id="next-lbl" style="color:#5f5e5a"></span>
 </div>
 <div id="st"></div>
 <div id="res"></div>
@@ -148,7 +162,7 @@ function efi(bars,en,sn){const raw=bars.map((b,i)=>i===0?0:(b.c-bars[i-1].c)*b.v
 function rsi(closes,n){const g=[],l=[];for(let i=1;i<closes.length;i++){const d=closes[i]-closes[i-1];g.push(Math.max(d,0));l.push(Math.max(-d,0));}const ag=wilder(g,n),al=wilder(l,n);const o=[null];for(let i=0;i<ag.length;i++){if(ag[i]==null){o.push(null);continue;}o.push(al[i]===0?100:100-100/(1+ag[i]/al[i]));}return o;}
 function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);const sl=ema(ml,sg);const h=ml.map((v,i)=>v!=null&&sl[i]!=null?v-sl[i]:null);return{ml,sl,h};}
 function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
-function aroon(bars,n){const o=new Array(bars.length).fill(null);for(let i=n;i<bars.length;i++){const sl=bars.slice(i-n,i+1);let hi=0,li=0;for(let j=1;j<=n;j++){if(sl[j].h>=sl[hi].h)hi=j;if(sl[j].l<=sl[li].l)li=j;}o[i]=((hi/n)*100)-((li/n)*100);}return o;}
+function adx(bars,n){const tr=[],pdm=[],ndm=[];for(let i=1;i<bars.length;i++){const h=bars[i].h,l=bars[i].l,ph=bars[i-1].h,pl=bars[i-1].l,pc=bars[i-1].c;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));const up=h-ph,dn=pl-l;pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);}const atr=wilder(tr,n),ap=wilder(pdm,n),an=wilder(ndm,n);const o=new Array(bars.length).fill(null);const dx=[];for(let i=0;i<atr.length;i++){if(atr[i]==null||atr[i]===0){dx.push(null);continue;}const pi=100*ap[i]/atr[i],ni=100*an[i]/atr[i];const d=pi+ni===0?null:100*Math.abs(pi-ni)/(pi+ni);dx.push(d);}const adxArr=wilder(dx,n);for(let i=0;i<adxArr.length;i++)o[i+1]=adxArr[i];return o;}
 
 function analyze(dBars,hBars){
   const L=dBars.length-1;
@@ -161,19 +175,18 @@ function analyze(dBars,hBars){
   const r8=rsi(closes,8);
   const{h:mH}=macd(closes,13,21,8);
   const bw=bbw(closes,21);
-  const ar=aroon(dBars,13);
+  const adxV=adx(dBars,13);
   const obvSlope=ob[L]>ob[L-3]?'上升':ob[L]<ob[L-3]?'下降':'平稳';
   const curBBW=bw[L],prvBBW=bw[L-1];
   const bbwExp=curBBW!=null&&prvBBW!=null&&curBBW>prvBBW;
   const bbw21Max=Math.max(...bw.slice(Math.max(0,L-21),L).filter(x=>x!=null));
-  const curAr=ar[L],curEFI=efiV[L],curMu=efiMu[L],curSig=efiSig[L];
+  const curAr=adxV[L],curEFI=efiV[L],curMu=efiMu[L],curSig=efiSig[L];
   const curMFI=m13[L],curRSI=r8[L],curH=mH[L],prvH=mH[L-1];
   const histRising=curH!=null&&prvH!=null&&curH>prvH;
   let regime,regAct,regMult=1.0;
   if(curBBW!=null&&curBBW>bbw21Max){regime='高波动';regAct='缩仓至0.191凯利';regMult=0.382;}
-  else if(curAr!=null&&curAr>50){regime='上升趋势';regAct='顺势做多，跟随HA';regMult=1.0;}
-  else if(curAr!=null&&curAr<-50){regime='下降趋势';regAct='顺势做空，跟随HA';regMult=1.0;}
-  else if(curAr!=null&&Math.abs(curAr)<=21&&!bbwExp){regime='震荡市';regAct='逆势操作，反向做单';regMult=0.618;}
+  else if(curAr!=null&&curAr>25){regime='趋势市';regAct='顺势操作，跟随HA方向';regMult=1.0;}
+  else if(curAr!=null&&curAr<20&&!bbwExp){regime='震荡市';regAct='逆势操作，反向做单';regMult=0.618;}
   else{regime='过渡期';regAct='缩仓至0.618，不逆势';regMult=0.618;}
   let flow='正常';
   let flowRaw='CLEAN';
@@ -237,7 +250,7 @@ function render(r,ticker){
   <div class="s-title">第一步 · 市场状态</div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${b(r.regime,regC)}<span style="font-size:12px;color:#888780">${r.regAct}</span></div>
   <div class="g2">
-    <div><div class="lbl">阿隆震荡指标(13)</div><div class="val">${fmt(r.curAr,1)}</div></div>
+    <div><div class="lbl">ADX(13)</div><div class="val">${fmt(r.curAr,1)}</div></div>
     <div><div class="lbl">布林带宽度BBW(21)</div><div class="val">${fmt(r.curBBW,4)} <span style="font-size:11px;color:#888780">${r.bbwState}</span></div></div>
   </div>
 </div>
@@ -293,7 +306,7 @@ function render(r,ticker){
 </div>`;
 }
 
-let retryTimer=null;
+let retryTimer=null,autoTimer=null,countdownTimer=null,autoOn=false;
 function clearRetry(){if(retryTimer){clearInterval(retryTimer);retryTimer=null;}}
 function startRetryCountdown(ticker,secs){
   const res=document.getElementById('res');
@@ -303,12 +316,56 @@ function startRetryCountdown(ticker,secs){
     <button onclick="clearRetry();run()" style="margin-left:8px;font-size:12px;padding:4px 10px">立即重试</button>
   </div>`;
   retryTimer=setInterval(()=>{
-    t--;
-    const el=document.getElementById('cd');
+    t--;const el=document.getElementById('cd');
     if(el)el.textContent=t;
     if(t<=0){clearRetry();run();}
   },1000);
 }
+function updateNextLabel(secsLeft){
+  const el=document.getElementById('next-lbl');
+  if(!el||!autoOn){if(el)el.textContent='';return;}
+  const m=Math.floor(secsLeft/60),s=secsLeft%60;
+  el.textContent='· '+(m>0?m+'分':'')+s+'秒后刷新';
+}
+function startAutoRefresh(){
+  if(autoTimer)clearInterval(autoTimer);
+  if(countdownTimer)clearInterval(countdownTimer);
+  const mins=parseInt(document.getElementById('interval-sel').value)||5;
+  let totalSecs=mins*60,secsLeft=totalSecs;
+  updateNextLabel(secsLeft);
+  countdownTimer=setInterval(()=>{
+    secsLeft--;
+    if(secsLeft<=0)secsLeft=totalSecs;
+    updateNextLabel(secsLeft);
+  },1000);
+  autoTimer=setInterval(()=>{
+    secsLeft=totalSecs;
+    const tk=document.getElementById('tk').value.trim().toUpperCase();
+    if(tk)run();
+  },totalSecs*1000);
+}
+function stopAutoRefresh(){
+  if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
+  if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null;}
+  const el=document.getElementById('next-lbl');
+  if(el)el.textContent='';
+}
+function toggleAuto(){
+  autoOn=!autoOn;
+  const btn=document.getElementById('autobtn');
+  if(autoOn){
+    const tk=document.getElementById('tk').value.trim().toUpperCase();
+    if(!tk){autoOn=false;return;}
+    btn.textContent='自动 开';
+    btn.style.background='#173404';btn.style.borderColor='#3b6d11';btn.style.color='#c0dd97';
+    startAutoRefresh();run();
+  }else{
+    btn.textContent='自动 关';
+    btn.style.background='#eaf3de';btn.style.borderColor='#3b6d11';btn.style.color='#27500a';
+    stopAutoRefresh();
+  }
+}
+document.getElementById('interval-sel').addEventListener('change',()=>{if(autoOn)startAutoRefresh();});
 async function run(){
   clearRetry();
   const ticker=document.getElementById('tk').value.trim().toUpperCase();
@@ -324,11 +381,12 @@ async function run(){
     try{hourly=await fetchBars(ticker,'1h','5d',null);}catch(e){}
     st.textContent='正在计算指标...';
     const r=analyze(daily,hourly);
-    st.textContent=`${ticker} · ${r.date} · ${daily.length} 个交易日`;
+    const now=new Date().toLocaleTimeString('zh-CN');
+    st.textContent=`${ticker} · ${r.date} · ${daily.length} 个交易日 · 更新于 ${now}`;
     render(r,ticker);
   }catch(e){
     st.textContent='';
-    if(e.message.includes('均失败')||e.message.includes('非JSON')||e.message.includes('Too Many')){
+    if(e.message.includes('所有线路均失败')||e.message.includes('非JSON')||e.message.includes('Too Many')||e.message.includes('Twelve Data')){
       startRetryCountdown(ticker,30);
     }else{
       res.innerHTML=`<div style="color:#a32d2d;font-size:13px;padding:.5rem 0"><strong>错误：</strong>${e.message}</div>`;
@@ -336,6 +394,34 @@ async function run(){
   }finally{btn.disabled=false;}
 }
 document.getElementById('tk').addEventListener('keydown',e=>{if(e.key==='Enter')run();});
+</script>
+
+<div id="timer-bar" style="display:none;position:sticky;bottom:0;background:#fff;border-top:1px solid #e8e6df;padding:10px 0;text-align:center;font-size:12px;color:#5f5e5a">
+  自动刷新倒计时：<span id="timer-cd" style="font-weight:500;font-family:monospace">5:00</span>
+  &nbsp;<button onclick="resetTimer();run()" style="font-size:11px;padding:3px 10px">立即刷新</button>
+  &nbsp;<button onclick="stopTimer()" style="font-size:11px;padding:3px 10px">停止</button>
+</div>
+<script>
+let _ti=null,_ts=300;
+function stopTimer(){clearInterval(_ti);_ti=null;document.getElementById('timer-bar').style.display='none';}
+function resetTimer(){
+  clearInterval(_ti);_ts=300;
+  document.getElementById('timer-bar').style.display='block';
+  _ti=setInterval(()=>{
+    _ts--;
+    const m=Math.floor(_ts/60),s=_ts%60;
+    const el=document.getElementById('timer-cd');
+    if(el)el.textContent=m+':'+(s<10?'0':'')+s;
+    if(_ts<=0){_ts=300;run();}
+  },1000);
+}
+const _origRun=run;
+window.run=async function(){
+  await _origRun.apply(this,arguments);
+  const tk=document.getElementById('tk').value.trim();
+  if(tk&&!_ti)resetTimer();
+  else if(tk&&_ti){_ts=300;}
+};
 </script>
 </body>
 </html>
