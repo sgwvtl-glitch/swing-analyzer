@@ -77,41 +77,63 @@
 <div id="st"></div>
 <div id="res"></div>
 <script>
+const TD_KEY='934f233f1c934c92a767bb9e52191d6d';
 const PROXIES=[
   u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
   u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
 ];
 const YH_HOSTS=['query1.finance.yahoo.com','query2.finance.yahoo.com'];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function tryOne(url){
+
+async function fetchTD(ticker,interval,outputsize){
+  const ivMap={'1d':'1day','1h':'1h'};
+  const url=`https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${ivMap[interval]}&outputsize=${outputsize}&apikey=${TD_KEY}`;
   const r=await fetch(url,{headers:{'Accept':'application/json'}});
-  const text=await r.text();const t=text.trim();
-  if(!t.startsWith('{')&&!t.startsWith('['))throw new Error('Non-JSON: '+t.slice(0,80));
+  const d=await r.json();
+  if(d.status==='error')throw new Error('Twelve Data: '+d.message);
+  if(!d.values||!d.values.length)throw new Error('Twelve Data: no values returned');
+  return d.values.slice().reverse().map(v=>({
+    date:new Date(v.datetime),
+    o:parseFloat(v.open),h:parseFloat(v.high),
+    l:parseFloat(v.low),c:parseFloat(v.close),
+    v:parseInt(v.volume)||0
+  })).filter(b=>!isNaN(b.c));
+}
+
+async function tryYH(url){
+  const t=(await(await fetch(url,{headers:{'Accept':'application/json'}})).text()).trim();
+  if(!t.startsWith('{')&&!t.startsWith('['))throw new Error('Non-JSON: '+t.slice(0,60));
   const d=JSON.parse(t);
   if(d.chart?.error?.description)throw new Error(d.chart.error.description);
-  if(!d.chart?.result?.[0])throw new Error('No chart data returned');
-  return d;
+  if(!d.chart?.result?.[0])throw new Error('No data');
+  const res=d.chart.result[0];const q=res.indicators.quote[0];
+  return res.timestamp.map((t,j)=>({
+    date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]||0
+  })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
 }
+
 async function fetchBars(ticker,interval,range,stEl){
-  const qs='/v8/finance/chart/'+ticker+'?interval='+interval+'&range='+range+'&includePrePost=false';
+  if(stEl)stEl.textContent='Fetching from Twelve Data...';
+  try{
+    const size=interval==='1d'?130:120;
+    return await fetchTD(ticker,interval,size);
+  }catch(e){
+    if(stEl)stEl.textContent='Twelve Data failed, trying fallback...';
+    await sleep(300);
+  }
+  const qs=`/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
   let attempt=0,lastErr;
   for(const host of YH_HOSTS){
-    const base='https://'+host+qs;
     for(const proxy of PROXIES){
       attempt++;
-      if(stEl)stEl.textContent='Trying route '+attempt+'/6...';
-      try{
-        const d=await tryOne(proxy(base));
-        const res=d.chart.result[0];const q=res.indicators.quote[0];
-        return res.timestamp.map((t,j)=>({
-          date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]||0
-        })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
-      }catch(e){lastErr=e;await sleep(400);}
+      if(stEl)stEl.textContent=`Fallback route ${attempt}/4...`;
+      try{return await tryYH(proxy('https://'+host+qs));}
+      catch(e){lastErr=e;await sleep(400);}
     }
   }
-  throw new Error('All 6 routes failed: '+lastErr.message);
+  throw new Error('All sources failed: '+lastErr.message);
 }
+
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
 function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
 function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
@@ -276,7 +298,7 @@ async function run(){
     render(r);
   }catch(e){
     st.textContent='';
-    if(e.message.indexOf('routes failed')>=0||e.message.indexOf('Non-JSON')>=0||e.message.indexOf('Too Many')>=0){
+    if(e.message.indexOf('All sources failed')>=0||e.message.indexOf('Non-JSON')>=0||e.message.indexOf('Too Many')>=0||e.message.indexOf('Twelve Data')>=0){
       startRetryCountdown(tk,30);
     }else{
       res.innerHTML='<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">Error: '+e.message+'</div>';
