@@ -136,6 +136,18 @@ async function fetchBars(ticker,interval,range,stEl){
   throw new Error('All sources failed: '+lastErr.message);
 }
 
+async function fetchMacro(stEl){
+  if(stEl)stEl.textContent='Fetching macro data...';
+  const B='https://api.twelvedata.com';
+  async function px(sym){const r=await fetch(B+'/price?symbol='+sym+'&apikey='+TD_KEY);const d=await r.json();if(!d.price)throw new Error(sym);return parseFloat(d.price);}
+  async function em(sym,n){const r=await fetch(B+'/ema?symbol='+sym+'&interval=1day&time_period='+n+'&outputsize=1&apikey='+TD_KEY);const d=await r.json();if(!d.values||!d.values[0])throw new Error(sym+' ema');return parseFloat(d.values[0].ema);}
+  let sp=null,se=null,qp=null,qe=null,vix=null;
+  try{[sp,se]=await Promise.all([px('SPY'),em('SPY',21)]);}catch(e){}
+  try{[qp,qe]=await Promise.all([px('QQQ'),em('QQQ',21)]);}catch(e){}
+  try{vix=await px('VIX');}catch(e){}
+  return{spyPrice:sp,spyEMA:se,qqqPrice:qp,qqqEMA:qe,vix};
+}
+
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
 function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
 function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
@@ -149,7 +161,7 @@ function rsi(closes,n){const g=[],l=[];for(let i=1;i<closes.length;i++){const d=
 function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);const sl=ema(ml,sg);const h=ml.map((v,i)=>v!=null&&sl[i]!=null?v-sl[i]:null);return{ml,sl,h};}
 function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
 function adx(bars,n){const tr=[],pdm=[],ndm=[];for(let i=1;i<bars.length;i++){const h=bars[i].h,l=bars[i].l,ph=bars[i-1].h,pl=bars[i-1].l,pc=bars[i-1].c;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));const up=h-ph,dn=pl-l;pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);}const atr=wilder(tr,n),ap=wilder(pdm,n),an=wilder(ndm,n);const o=new Array(bars.length).fill(null);const dx=[];for(let i=0;i<atr.length;i++){if(atr[i]==null||atr[i]===0){dx.push(null);continue;}const pi=100*ap[i]/atr[i],ni=100*an[i]/atr[i];const d=pi+ni===0?null:100*Math.abs(pi-ni)/(pi+ni);dx.push(d);}const adxArr=wilder(dx,n);for(let i=0;i<adxArr.length;i++)o[i+1]=adxArr[i];return o;}
-function analyze(dBars,hBars,ticker){
+function analyze(dBars,hBars,ticker,macro){
   const n=dBars.length,L=n-1;
   const closes=dBars.map(b=>b.c);
   const haD=ha(dBars);
@@ -217,10 +229,31 @@ function analyze(dBars,hBars,ticker){
   const rsiOK=(signal.includes('LONG')&&hRSI!=null&&hRSI>55)||(signal.includes('SHORT')&&hRSI!=null&&hRSI<45);
   const obvOK=(signal.includes('LONG')&&hOBV==='rising')||(signal.includes('SHORT')&&hOBV==='falling');
   const entryReady=aligned&&rsiOK&&obvOK;
+  var macroPass=true,macroReason='',spyAbove=null,qqqAbove=null,vixOk=null;
+  if(macro){
+    spyAbove=macro.spyPrice!=null&&macro.spyEMA!=null?macro.spyPrice>macro.spyEMA:null;
+    qqqAbove=macro.qqqPrice!=null&&macro.qqqEMA!=null?macro.qqqPrice>macro.qqqEMA:null;
+    var isLong=score>=2,isShort=score<=-2;
+    if(isLong){
+      vixOk=macro.vix!=null?macro.vix<25:null;
+      var pts=(spyAbove===true?1:0)+(qqqAbove===true?1:0)+(vixOk===true?1:0);
+      if(pts<2){macroPass=false;macroReason='Macro does not support long';}
+    }else if(isShort){
+      vixOk=macro.vix!=null?macro.vix>20:null;
+      var pts2=(spyAbove===false?1:0)+(qqqAbove===false?1:0)+(vixOk===true?1:0);
+      if(pts2<2){macroPass=false;macroReason='Macro does not support short';}
+    }else{vixOk=macro.vix!=null?macro.vix<25:null;}
+    if(!macroPass){signal='NO TRADE — macro blocked';sigClass='sig-none';}
+  }
+
   return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowMixed,curEFI,curMu,curSig,
     f1,f1r,f2,f2r,f3,f3r,score,infFlow,haBody:haBody.toFixed(3),
     signal,sigClass,a5:a5[L],a13:a13[L],bbwState:bbwExp?'expanding':'contracting',
-    hHA,hRSI,hOBV,hEFIDir,entryReady,ticker,date:dBars[L].date.toLocaleDateString()};
+    hHA,hRSI,hOBV,hEFIDir,entryReady,ticker,date:dBars[L].date.toLocaleDateString(),
+    macroPass,macroReason,spyAbove,qqqAbove,vixOk,
+    spyPrice:macro?macro.spyPrice:null,spyEMA:macro?macro.spyEMA:null,
+    qqqPrice:macro?macro.qqqPrice:null,qqqEMA:macro?macro.qqqEMA:null,
+    vix:macro?macro.vix:null};
 }
 function b(t,c){return'<span class="badge '+c+'">'+t+'</span>';}
 function fb(s){return s===1?b('+1','bg'):s===-1?b('-1','br'):b('0','bn');}
@@ -235,6 +268,7 @@ function render(r){
   const infC=r.infFlow?'bw':'bg';
   const sigW=r.curSig!=null?'&plusmn;'+fmtE(2*r.curSig):'n/a';
   document.getElementById('res').innerHTML=
+'<div class="card"><div class="s-title">Step 0 &middot; Macro gate</div>'+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.macroPass===false?'Macro blocked':'Macro pass',r.macroPass===false?'br':'bg')+(r.macroReason?'<span style="font-size:12px;color:#a32d2d;margin-left:6px">'+r.macroReason+'</span>':'')+'</div>'+'<div class="g3">'+'<div><div class="lbl">SPY vs EMA(21)</div><div class="val">'+(r.spyPrice!=null?r.spyPrice.toFixed(2):'--')+' '+b(r.spyAbove===true?'above':'below',r.spyAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">'+(r.qqqPrice!=null?r.qqqPrice.toFixed(2):'--')+' '+b(r.qqqAbove===true?'above':'below',r.qqqAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">VIX</div><div class="val">'+(r.vix!=null?r.vix.toFixed(2):'--')+' '+b(r.vix!=null?(r.vix<25?'normal':'elevated'):'--',r.vix!=null?(r.vix<25?'bg':'bw'):'bn')+'</div></div>'+'</div></div>'+
 '<div class="card"><div class="s-title">1 &middot; Regime</div>'+
 '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+b(r.regime,regC)+'<span style="font-size:12px;color:#888780">'+r.regAct+'</span></div>'+
 '<div class="g2"><div><div class="lbl">ADX(13)</div><div class="val">'+fmt(r.curAr,1)+'</div></div>'+
@@ -341,7 +375,8 @@ async function run(){
     var hourly=null;
     try{hourly=await fetchBars(tk,'1h','5d',null);}catch(e){}
     st.textContent='Calculating indicators...';
-    var r=analyze(daily,hourly,tk);
+    var macro=await fetchMacro(null);
+    var r=analyze(daily,hourly,tk,macro);
     var now=new Date().toLocaleTimeString();
     st.textContent=tk+' · '+r.date+' · '+daily.length+' bars · last updated '+now;
     render(r);
