@@ -51,7 +51,7 @@
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useCallback}=React;
+const {useState,useCallback,useEffect,useRef}=React;
 
 /* ── palette helpers ─────────────────────────────────────── */
 const C={
@@ -299,6 +299,11 @@ function App(){
   const [error,setError]=useState(null);
   const [result,setResult]=useState(null);
   const [prog,setProg]=useState("");
+  const [countdown,setCountdown]=useState(null);
+  const intervalRef=useRef(null);
+  const countRef=useRef(null);
+  const tickerRef=useRef(ticker);
+  useEffect(()=>{tickerRef.current=ticker;},[ticker]);
 
   const analyze=useCallback(async()=>{
     if(!ticker.trim())return;
@@ -320,9 +325,48 @@ function App(){
         closes:c.slice(0,60).reverse(),
         spyC:sc.slice(0,60).reverse(),
         sig,ts:new Date().toLocaleString()});
+      startAutoRefresh(ticker.toUpperCase());
     }catch(e){setError(e.message);}
     finally{setLoading(false);setProg("");}
-  },[ticker]);
+  },[ticker,startAutoRefresh]);
+
+  /* ── auto-refresh every 120s ─────────────────────────── */
+  const startAutoRefresh=useCallback((sym)=>{
+    if(intervalRef.current) clearInterval(intervalRef.current);
+    if(countRef.current)    clearInterval(countRef.current);
+    let secs=120;
+    setCountdown(secs);
+    countRef.current=setInterval(()=>{
+      secs-=1;
+      if(secs<=0) secs=120;
+      setCountdown(secs);
+    },1000);
+    intervalRef.current=setInterval(()=>{
+      secs=120;
+      setCountdown(secs);
+      // re-run analyze with current ticker
+      if(!tickerRef.current.trim()) return;
+      // call analyze silently (no result reset to avoid flash)
+      (async()=>{
+        try{
+          const [tD,spyD]=await Promise.all([fetchTS(tickerRef.current.toUpperCase(),300),fetchTS("SPY",300)]);
+          const c=tD.map(d=>parseFloat(d.close)),v=tD.map(d=>parseFloat(d.volume));
+          const sc=spyD.map(d=>parseFloat(d.close));
+          const price=c[0];
+          const sig=buildSignal(price,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),calcHMM(sc),calcKelly(c),calcCVaR(c));
+          setResult({ticker:tickerRef.current.toUpperCase(),price,chg:(c[0]-c[1])/c[1],
+            closes:c.slice(0,60).reverse(),spyC:sc.slice(0,60).reverse(),
+            sig,ts:new Date().toLocaleString()});
+        }catch(_){}
+      })();
+    },120000);
+  },[]);
+
+  // cleanup on unmount
+  useEffect(()=>()=>{
+    clearInterval(intervalRef.current);
+    clearInterval(countRef.current);
+  },[]);
 
   const R=result,S=result?.sig;
 
@@ -371,8 +415,8 @@ function App(){
                 onChange={e=>setTicker(e.target.value.toUpperCase())}
                 onKeyDown={e=>e.key==="Enter"&&analyze()}
                 placeholder="e.g. AAPL"
-                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",
-                  borderRadius:3,padding:"10px 14px",color:C.blue,fontSize:18,
+                style={{width:"100%",background:"#1C2535",border:"1px solid #2E3D58",
+                  borderRadius:3,padding:"10px 14px",color:"#E8EDF5",fontSize:18,
                   fontWeight:700,outline:"none",letterSpacing:3,
                   transition:"border-color .2s"}}/>
             </div>
@@ -403,8 +447,15 @@ function App(){
             <div style={{display:"flex",justifyContent:"space-between",
               alignItems:"flex-end",marginBottom:18}}>
               <div>
-                <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2,marginBottom:4}}>
-                  US EQUITY  ·  DAILY  ·  {R.ts}
+                <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2,marginBottom:4,display:"flex",gap:16,alignItems:"center"}}>
+                  <span>US EQUITY  ·  DAILY  ·  {R.ts}</span>
+                  {countdown!==null&&(
+                    <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
+                      background:"var(--surface2)",border:"1px solid var(--border)",
+                      borderRadius:3,padding:"2px 8px",letterSpacing:1.5}}>
+                      AUTO-REFRESH  {countdown}s
+                    </span>
+                  )}
                 </div>
                 <div style={{display:"flex",alignItems:"baseline",gap:14}}>
                   <span style={{fontSize:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
