@@ -152,7 +152,7 @@ function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=cl
 function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
 function adx(bars,n){const tr=[],pdm=[],ndm=[];for(let i=1;i<bars.length;i++){const h=bars[i].h,l=bars[i].l,ph=bars[i-1].h,pl=bars[i-1].l,pc=bars[i-1].c;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));const up=h-ph,dn=pl-l;pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);}const atr=wilder(tr,n),ap=wilder(pdm,n),an=wilder(ndm,n);const o=new Array(bars.length).fill(null);const dx=[];for(let i=0;i<atr.length;i++){if(atr[i]==null||atr[i]===0){dx.push(null);continue;}const pi=100*ap[i]/atr[i],ni=100*an[i]/atr[i];const d=pi+ni===0?null:100*Math.abs(pi-ni)/(pi+ni);dx.push(d);}const adxArr=wilder(dx,n);for(let i=0;i<adxArr.length;i++)o[i+1]=adxArr[i];return o;}
 
-function analyze(dBars,hBars){
+function analyze(dBars,hBars,macro){
   const L=dBars.length-1;
   const closes=dBars.map(b=>b.c);
   const haD=ha(dBars);
@@ -215,10 +215,31 @@ function analyze(dBars,hBars){
   const aligned=(signal.includes('做多')&&hHA.includes('看涨'))||(signal.includes('做空')&&hHA.includes('看跌'));
   const rsiOK=(signal.includes('做多')&&hRSI!=null&&hRSI>55)||(signal.includes('做空')&&hRSI!=null&&hRSI<45);
   const obvOK=(signal.includes('做多')&&hOBV==='上升')||(signal.includes('做空')&&hOBV==='下降');
+
+  var macroPass=true,macroReason='',spyAbove=null,qqqAbove=null,vixOk=null;
+  if(macro){
+    spyAbove=macro.spyPrice!=null&&macro.spyEMA!=null?macro.spyPrice>macro.spyEMA:null;
+    qqqAbove=macro.qqqPrice!=null&&macro.qqqEMA!=null?macro.qqqPrice>macro.qqqEMA:null;
+    var isLong=score>=2,isShort=score<=-2;
+    if(isLong){
+      vixOk=macro.vix!=null?macro.vix<25:null;
+      var pts=(spyAbove===true?1:0)+(qqqAbove===true?1:0)+(vixOk===true?1:0);
+      if(pts<2){macroPass=false;macroReason='宏观环境不支持做多';}
+    }else if(isShort){
+      vixOk=macro.vix!=null?macro.vix>20:null;
+      var pts2=(spyAbove===false?1:0)+(qqqAbove===false?1:0)+(vixOk===true?1:0);
+      if(pts2<2){macroPass=false;macroReason='宏观环境不支持做空';}
+    }else{vixOk=macro.vix!=null?macro.vix<25:null;}
+    if(!macroPass){signal='观望 — 宏观否决';sigClass='sig-none';}
+  }
   return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowRaw,flowMixed,curEFI,curMu,curSig,
     f1,f1r,f2,f2r,f3,f3r,score,infFlow,haBody:haBody.toFixed(3),signal,sigClass,
     a5:a5[L],a13:a13[L],bbwState:bbwExp?'扩张':'收缩',
     hHA,hRSI,hOBV,hEFIDir,entryReady:aligned&&rsiOK&&obvOK,
+    macroPass,macroReason,spyAbove,qqqAbove,vixOk,
+    spyPrice:macro?macro.spyPrice:null,spyEMA:macro?macro.spyEMA:null,
+    qqqPrice:macro?macro.qqqPrice:null,qqqEMA:macro?macro.qqqEMA:null,
+    vix:macro?macro.vix:null,
     date:dBars[L].date.toLocaleDateString('zh-CN')};
 }
 
@@ -234,6 +255,19 @@ function render(r,ticker){
   const entC=r.entryReady?'bg':r.hHA==='无数据'?'bn':'bw';
   const entTxt=r.entryReady?'可入场':r.hHA==='无数据'?'无1小时数据':'等待确认';
   document.getElementById('res').innerHTML=`
+<div class="card">
+  <div class="s-title">第零步 · 宏观门禁</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    ${b(r.macroPass===false?'宏观否决':'宏观通过',r.macroPass===false?'br':'bg')}
+    ${r.macroReason?'<span style="font-size:12px;color:#a32d2d;margin-left:6px">'+r.macroReason+'</span>':''}
+  </div>
+  <div class="g3">
+    <div><div class="lbl">SPY vs EMA(21)</div><div class="val">${r.spyPrice!=null?r.spyPrice.toFixed(2):'--'} ${b(r.spyAbove===true?'均线上方':'均线下方',r.spyAbove===true?'bg':'br')}</div></div>
+    <div><div class="lbl">QQQ vs EMA(21)</div><div class="val">${r.qqqPrice!=null?r.qqqPrice.toFixed(2):'--'} ${b(r.qqqAbove===true?'均线上方':'均线下方',r.qqqAbove===true?'bg':'br')}</div></div>
+    <div><div class="lbl">VIX 恐慌指数</div><div class="val">${r.vix!=null?r.vix.toFixed(2):'--'} ${b(r.vix!=null?(r.vix<25?'正常':'偏高'):'--',r.vix!=null?(r.vix<25?'bg':'bw'):'bn')}</div></div>
+  </div>
+</div>
+
 <div class="card">
   <div class="s-title">第一步 · 市场状态</div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${b(r.regime,regC)}<span style="font-size:12px;color:#888780">${r.regAct}</span></div>
@@ -368,7 +402,8 @@ async function run(){
     let hourly=null;
     try{hourly=await fetchBars(ticker,'1h','5d',null);}catch(e){}
     st.textContent='正在计算指标...';
-    const r=analyze(daily,hourly);
+    const macro=await fetchMacro(null);
+    const r=analyze(daily,hourly,macro);
     const now=new Date().toLocaleTimeString('zh-CN');
     st.textContent=`${ticker} · ${r.date} · ${daily.length} 个交易日 · 更新于 ${now}`;
     render(r,ticker);
