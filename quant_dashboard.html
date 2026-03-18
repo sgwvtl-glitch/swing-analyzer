@@ -1,428 +1,638 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Quant Edge — US Equity Swing System</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #080808; }
-    input, button { font-family: 'Courier New', monospace; }
+    /* ── Design tokens ─────────────────────────────────────────────
+       Background   #090C12  surface   #0F1319  border  #1C2232
+       Text         #B8C0CC  dim       #3D4557  muted   #5C6880
+       Blue (buy)   #4D8FD6  lt-blue   #7AAEE0
+       Teal (pos)   #3BB58A
+       Amber (hold) #D4A84B
+       Orange(redu) #C07840
+       Red  (sell)  #C75C5C
+    ─────────────────────────────────────────────────────────────── */
+    :root {
+      --bg:       #090C12;
+      --surface:  #0F1319;
+      --surface2: #131820;
+      --border:   #1C2232;
+      --border2:  #242C3E;
+      --text:     #B8C0CC;
+      --text-dim: #3D4557;
+      --text-mid: #5C6880;
+      --blue:     #4D8FD6;
+      --blue-lt:  #7AAEE0;
+      --teal:     #3BB58A;
+      --amber:    #D4A84B;
+      --orange:   #C07840;
+      --red:      #C75C5C;
+      --red-lt:   #D47070;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;}
+    input,button{font-family:'Courier New',monospace;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    .fade{animation:fadeUp .35s ease forwards}
+    /* scrollbar */
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+    /* table row hover */
+    tr.scenario:hover td{background:rgba(77,143,214,.04)!important}
   </style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useCallback}=React;
 
-  <script type="text/babel">
-    const { useState, useCallback, useRef } = React;
+/* ── palette helpers ─────────────────────────────────────── */
+const C={
+  buy:    "#4D8FD6",
+  buyLt:  "#7AAEE0",
+  teal:   "#3BB58A",
+  amber:  "#D4A84B",
+  orange: "#C07840",
+  red:    "#C75C5C",
+  redLt:  "#D47070",
+  text:   "#B8C0CC",
+  mid:    "#5C6880",
+  dim:    "#3D4557",
+};
+const signalColor=a=>({BUY:C.teal,HOLD:C.amber,REDUCE:C.orange,SELL:C.red,"NO TRADE":C.mid})[a]||C.mid;
+const riskColor  =r=>({LOW:C.teal,MEDIUM:C.amber,HIGH:C.orange,EXTREME:C.red})[r];
 
-    // ─── Utility helpers ─────────────────────────────────────────────
-    const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-    const std = arr => {
-      const m = mean(arr);
-      return Math.sqrt(mean(arr.map(x => (x - m) ** 2)));
-    };
-    const pct = (v, digits = 2) => `${(v * 100).toFixed(digits)}%`;
+/* ── math utils ─────────────────────────────────────────── */
+const mean  =a=>a.reduce((s,v)=>s+v,0)/a.length;
+const std   =a=>{const m=mean(a);return Math.sqrt(mean(a.map(x=>(x-m)**2)));};
+const pct   =(v,d=1)=>`${(v*100).toFixed(d)}%`;
+const clamp =(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const fmt$  =v=>`$${v.toFixed(2)}`;
 
-    // ─── Quant calculations ──────────────────────────────────────────
-    function calcMomentum(closes) {
-      if (closes.length < 260) return null;
-      const m1ago  = closes[21];
-      const m12ago = closes[252];
-      return (m1ago - m12ago) / m12ago;
-    }
+/* ── quant calculations ──────────────────────────────────── */
+function calcMomentum(c){
+  if(c.length<260)return null;
+  return{mom12_1:(c[21]-c[252])/c[252],mom1m:(c[0]-c[21])/c[21]};
+}
+function calcAmihud(c,v){
+  const n=Math.min(60,c.length-1),r=[];
+  for(let i=0;i<n;i++){const dv=v[i]*c[i];if(dv>0)r.push(Math.abs((c[i]-c[i+1])/c[i+1])/dv);}
+  return mean(r)*1e9;
+}
+function calcTrend(c){
+  const ma20=mean(c.slice(0,20)),ma50=mean(c.slice(0,50));
+  const ma200=c.length>=200?mean(c.slice(0,200)):null,p=c[0];
+  return{ma20,ma50,ma200,aboveMa20:p>ma20,aboveMa50:p>ma50,aboveMa200:ma200?p>ma200:null};
+}
+function calcRSI(c,per=14){
+  if(c.length<per+1)return null;
+  const ch=c.slice(0,per+1).map((p,i,a)=>i<per?p-a[i+1]:null).filter(v=>v!==null);
+  const ag=mean(ch.map(x=>x>0?x:0)),al=mean(ch.map(x=>x<0?-x:0));
+  return al===0?100:100-100/(1+ag/al);
+}
+function calcHMM(s){
+  if(s.length<200)return{state:"unknown",confidence:0};
+  const ma200=mean(s.slice(0,200)),ma50=mean(s.slice(0,50)),p=s[0];
+  const rets=s.slice(0,21).map((v,i,a)=>i<20?(v-a[i+1])/a[i+1]:null).filter(Boolean);
+  const vol=std(rets)*Math.sqrt(252);
+  let state,conf,label;
+  if(p>ma200&&p>ma50&&vol<0.18)     {state="BULL";      conf=.88;label="Risk-On";}
+  else if(p<ma200&&p<ma50&&vol>.25) {state="BEAR";      conf=.87;label="Risk-Off";}
+  else if(p>ma200&&p<ma50)          {state="TRANSITION";conf=.60;label="Caution";}
+  else                              {state="TRANSITION";conf=.55;label="Mixed";}
+  return{state,conf,label,ma200,ma50,vol};
+}
+function calcKelly(c){
+  if(c.length<265)return null;
+  const fwd=[];
+  for(let i=252;i<c.length-5;i++)fwd.push((c[i-5]-c[i])/c[i]);
+  const w=fwd.filter(r=>r>0),l=fwd.filter(r=>r<0);
+  if(!w.length||!l.length)return null;
+  const p=w.length/fwd.length,q=1-p,b=mean(w)/Math.abs(mean(l));
+  const fStar=(p*b-q)/b;
+  return{p,q,b,fStar,fAdj:Math.max(0,.33*fStar)};
+}
+function calcCVaR(c){
+  if(c.length<60)return null;
+  const rets=c.slice(0,61).map((p,i,a)=>i<60?(p-a[i+1])/a[i+1]:null).filter(Boolean);
+  rets.sort((a,b)=>a-b);
+  const cut=Math.floor(rets.length*.05);
+  const cvar=Math.abs(mean(rets.slice(0,cut+1))),var95=Math.abs(rets[cut]);
+  return{cvar,var95,annVol:std(rets)*Math.sqrt(252),safe:cvar<.025};
+}
 
-    function calcAmihud(closes, volumes) {
-      const n = Math.min(60, closes.length - 1);
-      const ratios = [];
-      for (let i = 0; i < n; i++) {
-        const ret = Math.abs((closes[i] - closes[i + 1]) / closes[i + 1]);
-        const vol = volumes[i] * closes[i];
-        if (vol > 0) ratios.push(ret / vol);
-      }
-      return mean(ratios) * 1e9;
-    }
+/* ── signal engine ───────────────────────────────────────── */
+function buildSignal(price,mom,amihud,trend,rsi,hmm,kelly,cvar){
+  if(!mom||!kelly||!cvar||!hmm)return null;
+  let score=0;const notes=[];
+  const{mom12_1,mom1m}=mom;
 
-    function calcHMM(spyCloses) {
-      if (spyCloses.length < 200) return { state: "unknown", confidence: 0 };
-      const ma200   = mean(spyCloses.slice(0, 200));
-      const ma50    = mean(spyCloses.slice(0, 50));
-      const current = spyCloses[0];
-      const above200 = current > ma200;
-      const above50  = current > ma50;
-      const rets = spyCloses.slice(0, 21)
-        .map((p, i, a) => i < 20 ? (p - a[i + 1]) / a[i + 1] : null)
-        .filter(Boolean);
-      const vol20 = std(rets) * Math.sqrt(252);
-      let state, confidence;
-      if (above200 && above50 && vol20 < 0.20)       { state = "RISK_ON";  confidence = 0.85; }
-      else if (!above200 && !above50 && vol20 > 0.25) { state = "RISK_OFF"; confidence = 0.88; }
-      else                                             { state = "RISK_ON";  confidence = 0.55; }
-      return { state, confidence, ma200, ma50, vol20 };
-    }
+  // 1. Regime
+  if(hmm.state==="BULL")        score+=3;
+  else if(hmm.state==="TRANSITION"){score+=1;notes.push("Market in transition — reduce position size");}
+  else                          {score-=4;notes.push("Bear regime active — long bias suspended");}
 
-    function calcKelly(closes) {
-      if (closes.length < 260) return null;
-      const fwdReturns = [];
-      for (let i = 252; i < closes.length - 5; i++) {
-        fwdReturns.push((closes[i - 5] - closes[i]) / closes[i]);
-      }
-      const wins   = fwdReturns.filter(r => r > 0);
-      const losses = fwdReturns.filter(r => r < 0);
-      if (!wins.length || !losses.length) return null;
-      const p     = wins.length / fwdReturns.length;
-      const q     = 1 - p;
-      const b     = mean(wins) / Math.abs(mean(losses));
-      const fStar = (p * b - q) / b;
-      const fAdj  = Math.max(0, 0.33 * fStar);
-      return { p, q, b, fStar, fAdj, wins: wins.length, losses: losses.length };
-    }
+  // 2. 12-1 Momentum
+  if(mom12_1>.15)       score+=2;
+  else if(mom12_1>.05)  score+=1;
+  else if(mom12_1<-.05){score-=2;notes.push("Negative 12-month momentum — adverse trend");}
+  else                  score-=1;
 
-    function calcCVaR(closes, confidence = 0.95) {
-      if (closes.length < 60) return null;
-      const rets = closes.slice(0, 60)
-        .map((p, i, a) => i < 59 ? (p - a[i + 1]) / a[i + 1] : null)
-        .filter(Boolean);
-      rets.sort((a, b) => a - b);
-      const cutoff = Math.floor(rets.length * (1 - confidence));
-      const tail   = rets.slice(0, cutoff + 1);
-      const cvar   = Math.abs(mean(tail));
-      const var95  = Math.abs(rets[cutoff]);
-      return { cvar, var95, safe: cvar < 0.02 };
-    }
+  // 3. Short-term reversal
+  if(mom1m<-.08){score+=1;notes.push("Short-term pullback detected — potential entry point");}
+  if(mom1m>.12) {score-=1;notes.push("Short-term overbought — consider waiting for pullback");}
 
-    function generateSignal(momentum, amihud, hmm, kelly, cvar) {
-      if (!momentum || !kelly || !cvar || !hmm) return null;
-      let score = 0;
-      const factors = [];
+  // 4. MA stack
+  if(trend.aboveMa200&&trend.aboveMa50&&trend.aboveMa20)score+=2;
+  else if(trend.aboveMa200&&trend.aboveMa50)             score+=1;
+  else if(!trend.aboveMa200&&!trend.aboveMa50)          {score-=2;notes.push("Price below MA50 and MA200 — structural downtrend");}
+  else                                                   score-=1;
 
-      if (momentum > 0.05)      { score += 2; factors.push({ label: "Momentum",   value: "+Strong",       color: "#00ff88" }); }
-      else if (momentum > 0)    { score += 1; factors.push({ label: "Momentum",   value: "+Weak",         color: "#88ff88" }); }
-      else                      { score -= 1; factors.push({ label: "Momentum",   value: "Negative",      color: "#ff6b6b" }); }
+  // 5. RSI
+  if(rsi!==null){
+    if(rsi<30)     {score+=1;notes.push(`RSI oversold at ${rsi.toFixed(0)} — mean reversion potential`);}
+    else if(rsi>75){score-=2;notes.push(`RSI overbought at ${rsi.toFixed(0)} — momentum exhaustion risk`);}
+    else if(rsi>50) score+=1;
+  }
 
-      if (amihud < 0.5)         { score += 1; factors.push({ label: "Liquidity",  value: "High",          color: "#00ff88" }); }
-      else if (amihud < 2.0)    {             factors.push({ label: "Liquidity",  value: "Medium",        color: "#ffd700" }); }
-      else                      { score -= 1; factors.push({ label: "Liquidity",  value: "Low",           color: "#ff6b6b" }); }
+  // 6. Liquidity
+  if(amihud>5)       {score-=2;notes.push("Low liquidity — significant slippage risk on execution");}
+  else if(amihud<.5)  score+=1;
 
-      if (hmm.state === "RISK_ON") { score += 2; factors.push({ label: "Regime",  value: "Risk-On",       color: "#00ff88" }); }
-      else                         { score -= 2; factors.push({ label: "Regime",  value: "Risk-Off",      color: "#ff6b6b" }); }
+  // 7. CVaR
+  if(!cvar.safe){score-=1;notes.push(`Elevated tail risk: CVaR(95%) = ${pct(cvar.cvar)}`);}
 
-      if (kelly.fAdj > 0.05)    { score += 1; factors.push({ label: "Kelly Edge", value: pct(kelly.fAdj), color: "#00ff88" }); }
-      else                      { score -= 1; factors.push({ label: "Kelly Edge", value: "Marginal",      color: "#ff6b6b" }); }
+  // Action
+  let action,direction;
+  if(hmm.state==="BEAR"){action=score<-4?"SELL":"REDUCE";direction="FLAT";}
+  else if(score>=7)     {action="BUY";   direction="LONG";}
+  else if(score>=4)     {action="BUY";   direction="LONG";}
+  else if(score>=1)     {action="HOLD";  direction="LONG";}
+  else if(score>=-2)    {action="HOLD";  direction="FLAT";}
+  else                  {action="REDUCE";direction="FLAT";}
 
-      if (cvar.safe)            { score += 1; factors.push({ label: "CVaR(95%)",  value: pct(cvar.cvar),  color: "#00ff88" }); }
-      else                      { score -= 1; factors.push({ label: "CVaR(95%)",  value: "⚠ " + pct(cvar.cvar), color: "#ff6b6b" }); }
+  // Risk
+  const v=cvar.annVol;
+  const risk=v<.20&&hmm.state==="BULL"&&amihud<1?"LOW":v<.30&&hmm.state!=="BEAR"?"MEDIUM":v<.45?"HIGH":"EXTREME";
 
-      let signal, color;
-      if (hmm.state === "RISK_OFF") { signal = "NO TRADE";   color = "#ff6b6b"; }
-      else if (score >= 5)          { signal = "STRONG BUY"; color = "#00ff88"; }
-      else if (score >= 3)          { signal = "BUY";        color = "#88ff88"; }
-      else if (score >= 1)          { signal = "WEAK BUY";   color = "#ffd700"; }
-      else                          { signal = "AVOID";      color = "#ff6b6b"; }
+  // Position size
+  const regM={BULL:1,TRANSITION:.5,BEAR:0}[hmm.state]??0;
+  const rkM ={LOW:1,MEDIUM:.75,HIGH:.5,EXTREME:.25}[risk];
+  const acM ={BUY:1,HOLD:.6,REDUCE:.2,SELL:0}[action]??0;
+  const size=clamp(Math.round(kelly.fAdj*regM*rkM*acM*1000)/10,0,15);
 
-      return { signal, color, score, maxScore: 7, factors };
-    }
+  // Levels
+  const atr=cvar.var95*price;
+  const stop=price-atr*3,target=price+atr*6,rr=(atr*6)/(atr*3);
 
-    // ─── API fetch ───────────────────────────────────────────────────
-    const API_KEY = "934f233f1c934c92a767bb9e52191d6d";
+  const aColor=signalColor(action);
+  const rColor=riskColor(risk);
 
-    async function fetchTimeSeries(symbol, outputsize = 300) {
-      const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=${outputsize}&apikey=${API_KEY}&dp=4`;
-      const res  = await fetch(url);
-      const data = await res.json();
-      if (data.status === "error") throw new Error(data.message);
-      if (!data.values || data.values.length === 0) throw new Error("No data returned for " + symbol);
-      return data.values;
-    }
+  return{
+    action,direction,risk,rColor,aColor,size,stop,target,rr,
+    score,maxScore:12,notes,kelly,hmm,cvar,trend,rsi,
+    mom:mom12_1,mom1m,amihud,
+    factors:[
+      {label:"SPY Regime",     value:hmm.label,             color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
+      {label:"12-1 Momentum",  value:pct(mom12_1),          color:mom12_1>.05?C.teal:mom12_1>0?C.amber:C.red},
+      {label:"MA Stack",       value:trend.aboveMa200&&trend.aboveMa50?"Aligned":"Broken", color:trend.aboveMa200&&trend.aboveMa50?C.teal:C.red},
+      {label:"RSI (14)",       value:rsi?rsi.toFixed(1):"—",color:rsi<30?C.teal:rsi>75?C.red:C.amber},
+      {label:"Liquidity",      value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
+      {label:"CVaR (95%)",     value:pct(cvar.cvar),        color:cvar.safe?C.teal:C.red},
+    ]
+  };
+}
 
-    // ─── Sub-components ──────────────────────────────────────────────
-    const MetricCard = ({ title, value, sub, color, badge }) => (
-      <div style={{
-        background: "rgba(0,0,0,0.4)", border: `1px solid ${color || "#333"}33`,
-        borderLeft: `3px solid ${color || "#555"}`, padding: "14px 16px", borderRadius: 4,
-        fontFamily: "'Courier New', monospace"
-      }}>
-        <div style={{ fontSize: 10, color: "#666", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
-        <div style={{ fontSize: 22, fontWeight: 700, color: color || "#e0e0e0", lineHeight: 1 }}>{value}</div>
-        {sub   && <div style={{ fontSize: 11, color: "#555", marginTop: 5 }}>{sub}</div>}
-        {badge && <div style={{ fontSize: 10, color: badge.color, marginTop: 4, fontWeight: 600 }}>{badge.text}</div>}
-      </div>
-    );
+/* ── API ─────────────────────────────────────────────────── */
+const KEY="934f233f1c934c92a767bb9e52191d6d";
+async function fetchTS(sym,n=300){
+  const d=await(await fetch(`https://api.twelvedata.com/time_series?symbol=${sym}&interval=1day&outputsize=${n}&apikey=${KEY}&dp=4`)).json();
+  if(d.status==="error")throw new Error(d.message);
+  if(!d.values?.length)throw new Error("No data: "+sym);
+  return d.values;
+}
 
-    const ProgressBar = ({ label, value, max, color }) => (
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#666", marginBottom: 4, fontFamily: "monospace" }}>
-          <span>{label}</span><span style={{ color }}>{value}</span>
-        </div>
-        <div style={{ height: 3, background: "#1a1a1a", borderRadius: 2 }}>
-          <div style={{ height: "100%", width: `${Math.min(100, (parseFloat(value) / max) * 100)}%`, background: color, borderRadius: 2, transition: "width 0.8s ease" }} />
-        </div>
-      </div>
-    );
+/* ── UI primitives ───────────────────────────────────────── */
+const Divider=()=><div style={{width:1,background:"var(--border)",alignSelf:"stretch"}}/>;
 
-    const SparkLine = ({ data, color = "#00ff88", height = 50 }) => {
-      if (!data || data.length < 2) return null;
-      const min   = Math.min(...data), max = Math.max(...data);
-      const range = max - min || 1;
-      const W = 200, H = height;
-      const pts = data.map((v, i) => {
-        const x = (i / (data.length - 1)) * W;
-        const y = H - ((v - min) / range) * (H - 4) - 2;
-        return `${x},${y}`;
-      }).join(" ");
-      return (
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: "block" }}>
-          <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" />
-        </svg>
+const FactorRow=({label,value,color})=>(
+  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+    padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
+    <span style={{fontSize:11,color:"var(--text-mid)"}}>{label}</span>
+    <span style={{fontSize:11,color,fontWeight:600,letterSpacing:.5}}>{value}</span>
+  </div>
+);
+
+const Spark=({data,color,h=50})=>{
+  if(!data||data.length<2)return null;
+  const lo=Math.min(...data),hi=Math.max(...data),rng=hi-lo||1,W=200;
+  const pts=data.map((v,i)=>`${(i/(data.length-1))*W},${h-((v-lo)/rng)*(h-4)-2}`).join(" ");
+  return(
+    <svg width="100%" viewBox={`0 0 ${W} ${h}`} preserveAspectRatio="none" style={{display:"block"}}>
+      <defs>
+        <linearGradient id={`g${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity=".15"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" opacity=".9"/>
+    </svg>
+  );
+};
+
+const RiskBar=({level,color})=>{
+  const lvls=["LOW","MEDIUM","HIGH","EXTREME"],idx=lvls.indexOf(level);
+  return(
+    <div style={{display:"flex",gap:3,marginTop:7}}>
+      {lvls.map((l,i)=>(
+        <div key={l} title={l} style={{flex:1,height:3,borderRadius:1,
+          background:i<=idx?color:"var(--border2, #242C3E)",
+          opacity:i<=idx?1-.1*i:.6,transition:"background .3s"}}/>
+      ))}
+    </div>
+  );
+};
+
+const SizeBar=({size,color})=>(
+  <div>
+    <div style={{height:6,background:"var(--border)",borderRadius:3,overflow:"hidden",marginTop:8}}>
+      <div style={{height:"100%",width:`${(size/15)*100}%`,background:color,borderRadius:3,
+        transition:"width 1.2s cubic-bezier(.4,0,.2,1)"}}/>
+    </div>
+    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,
+      color:"var(--text-dim)",marginTop:3,letterSpacing:.5}}>
+      <span>0%</span><span>5%</span><span>10%</span><span>15%</span>
+    </div>
+  </div>
+);
+
+const Card=({children,style})=>(
+  <div style={{border:"1px solid var(--border)",borderRadius:4,padding:"16px",
+    background:"var(--surface)",...style}}>
+    {children}
+  </div>
+);
+
+const Label=({children})=>(
+  <div style={{fontSize:9,color:"var(--text-dim)",letterSpacing:2.5,
+    textTransform:"uppercase",marginBottom:7,fontWeight:500}}>{children}</div>
+);
+
+const BigNum=({value,unit,color,size=34})=>(
+  <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+    <span style={{fontSize:size,fontWeight:700,color,lineHeight:1,letterSpacing:.5}}>{value}</span>
+    {unit&&<span style={{fontSize:13,color:"var(--text-mid)",fontWeight:400}}>{unit}</span>}
+  </div>
+);
+
+/* ── Main App ─────────────────────────────────────────────── */
+function App(){
+  const [ticker,setTicker]=useState("AAPL");
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState(null);
+  const [result,setResult]=useState(null);
+  const [prog,setProg]=useState("");
+
+  const analyze=useCallback(async()=>{
+    if(!ticker.trim())return;
+    setLoading(true);setError(null);setResult(null);
+    try{
+      setProg("Fetching market data…");
+      const [tD,spyD]=await Promise.all([fetchTS(ticker.toUpperCase(),300),fetchTS("SPY",300)]);
+      setProg("Running quant models…");
+      const c=tD.map(d=>parseFloat(d.close)),v=tD.map(d=>parseFloat(d.volume));
+      const sc=spyD.map(d=>parseFloat(d.close));
+      const price=c[0];
+      const sig=buildSignal(
+        price,
+        calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
+        calcHMM(sc),calcKelly(c),calcCVaR(c)
       );
-    };
+      setResult({ticker:ticker.toUpperCase(),price,
+        chg:(c[0]-c[1])/c[1],
+        closes:c.slice(0,60).reverse(),
+        spyC:sc.slice(0,60).reverse(),
+        sig,ts:new Date().toLocaleString()});
+    }catch(e){setError(e.message);}
+    finally{setLoading(false);setProg("");}
+  },[ticker]);
 
-    // ─── Main App ────────────────────────────────────────────────────
-    function QuantDashboard() {
-      const [ticker,   setTicker]   = useState("AAPL");
-      const [loading,  setLoading]  = useState(false);
-      const [error,    setError]    = useState(null);
-      const [result,   setResult]   = useState(null);
-      const [progress, setProgress] = useState("");
+  const R=result,S=result?.sig;
 
-      const analyze = useCallback(async () => {
-        if (!ticker.trim()) { setError("Please enter a ticker symbol"); return; }
-        setLoading(true); setError(null); setResult(null);
-        try {
-          setProgress("Fetching " + ticker.toUpperCase() + " daily data…");
-          const tickerData = await fetchTimeSeries(ticker.toUpperCase(), 300);
+  /* scenario table rows */
+  const scenarios=S?[
+    {label:"Strong Conviction Buy", minScore:7,  g:.33,aMult:1.0, action:"BUY",    aColor:C.teal},
+    {label:"Standard Buy",          minScore:4,  g:.33,aMult:.75,  action:"BUY",    aColor:C.teal},
+    {label:"Hold / Maintain",       minScore:1,  g:.33,aMult:.60,  action:"HOLD",   aColor:C.amber},
+    {label:"Reduce Exposure",       minScore:-2, g:.33,aMult:.20,  action:"REDUCE", aColor:C.orange},
+    {label:"Exit / Bear Flat",      minScore:-99,g:.33,aMult:0,    action:"SELL",   aColor:C.red},
+  ]:[];
 
-          setProgress("Fetching SPY regime data…");
-          const spyData = await fetchTimeSeries("SPY", 300);
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)",
+      backgroundImage:"radial-gradient(ellipse at 20% 0%, #0A1628 0%, transparent 50%)",
+      fontFamily:"'Courier New',monospace"}}>
 
-          setProgress("Calculating signals…");
-          const closes    = tickerData.map(d => parseFloat(d.close));
-          const volumes   = tickerData.map(d => parseFloat(d.volume));
-          const spyCloses = spyData.map(d => parseFloat(d.close));
-
-          const momentum = calcMomentum(closes);
-          const amihud   = calcAmihud(closes, volumes);
-          const hmm      = calcHMM(spyCloses);
-          const kelly    = calcKelly(closes);
-          const cvar     = calcCVaR(closes);
-          const signal   = generateSignal(momentum, amihud, hmm, kelly, cvar);
-
-          setResult({
-            ticker: ticker.toUpperCase(),
-            price: closes[0],
-            priceChange: (closes[0] - closes[1]) / closes[1],
-            closes:    closes.slice(0, 60).reverse(),
-            spyCloses: spyCloses.slice(0, 60).reverse(),
-            momentum, amihud, hmm, kelly, cvar, signal,
-            timestamp: new Date().toLocaleString()
-          });
-        } catch (e) {
-          setError(e.message);
-        } finally {
-          setLoading(false); setProgress("");
-        }
-      }, [ticker]);
-
-      const R = result;
-
-      return (
-        <div style={{
-          minHeight: "100vh", background: "#080808",
-          backgroundImage: "radial-gradient(ellipse at 20% 0%, #001a0f 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, #0a0010 0%, transparent 60%)",
-          color: "#c8c8c8", fontFamily: "'Courier New', monospace", padding: 0
-        }}>
-
-          {/* ── Header ── */}
-          <div style={{
-            borderBottom: "1px solid #1a1a1a", padding: "16px 32px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: "rgba(0,0,0,0.6)", position: "sticky", top: 0, zIndex: 100
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00ff88", boxShadow: "0 0 8px #00ff88" }} />
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 3, color: "#00ff88" }}>QUANT EDGE</span>
-              <span style={{ fontSize: 10, color: "#333", letterSpacing: 2 }}>/ US EQUITY SWING SYSTEM</span>
-            </div>
-            <div style={{ fontSize: 10, color: "#333" }}>MOMENTUM · HMM · KELLY · CVAR</div>
+      {/* ── TOP BAR ── */}
+      <div style={{height:46,borderBottom:"1px solid var(--border)",
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"0 28px",background:"rgba(9,12,18,.95)",
+        position:"sticky",top:0,zIndex:100,backdropFilter:"blur(8px)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:7}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:C.blue,
+              animation:"pulse 3s infinite",boxShadow:`0 0 6px ${C.blue}`}}/>
+            <span style={{fontSize:11,fontWeight:700,letterSpacing:4,color:C.blue}}>QUANT EDGE</span>
           </div>
+          <span style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>US EQUITY SWING SYSTEM</span>
+        </div>
+        <div style={{display:"flex",gap:20}}>
+          {["MOMENTUM","HMM REGIME","KELLY","CVaR"].map(t=>(
+            <span key={t} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>{t}</span>
+          ))}
+        </div>
+      </div>
 
-          <div style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 24px" }}>
+      <div style={{maxWidth:1020,margin:"0 auto",padding:"24px 20px"}}>
 
-            {/* ── Input panel ── */}
-            <div style={{ border: "1px solid #1c1c1c", borderRadius: 6, padding: 24, marginBottom: 28, background: "rgba(0,255,136,0.02)" }}>
-              <div style={{ fontSize: 10, color: "#444", letterSpacing: 3, marginBottom: 16 }}>// CONFIGURATION</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end" }}>
-                <div>
-                  <label style={{ fontSize: 10, color: "#555", letterSpacing: 2, display: "block", marginBottom: 6 }}>TICKER</label>
-                  <input
-                    value={ticker}
-                    onChange={e => setTicker(e.target.value.toUpperCase())}
-                    onKeyDown={e => e.key === "Enter" && analyze()}
-                    placeholder="AAPL"
-                    style={{
-                      width: "100%", background: "#0d0d0d", border: "1px solid #2a2a2a",
-                      borderRadius: 3, padding: "10px 12px", color: "#00ff88", fontSize: 14,
-                      fontFamily: "monospace", fontWeight: 700, outline: "none", letterSpacing: 2
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={analyze} disabled={loading}
-                  style={{
-                    background: loading ? "#111" : "rgba(0,255,136,0.1)",
-                    border: `1px solid ${loading ? "#222" : "#00ff88"}`,
-                    color: loading ? "#333" : "#00ff88", borderRadius: 3,
-                    padding: "10px 20px", fontSize: 11, letterSpacing: 2,
-                    cursor: loading ? "not-allowed" : "pointer",
-                    fontWeight: 700, whiteSpace: "nowrap", transition: "all 0.2s"
-                  }}
-                >
-                  {loading ? "RUNNING…" : "▶ ANALYZE"}
-                </button>
-              </div>
-              {progress && <div style={{ marginTop: 12, fontSize: 10, color: "#00ff88", opacity: 0.6 }}>◆ {progress}</div>}
-              {error    && (
-                <div style={{ marginTop: 12, fontSize: 11, color: "#ff6b6b", background: "rgba(255,107,107,0.05)", padding: "8px 12px", borderRadius: 3, border: "1px solid #ff6b6b22" }}>
-                  ✗ {error}
-                </div>
-              )}
+        {/* ── INPUT PANEL ── */}
+        <Card style={{marginBottom:22,padding:"18px 22px",background:"var(--surface2)"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"end"}}>
+            <div>
+              <Label>Ticker Symbol</Label>
+              <input value={ticker}
+                onChange={e=>setTicker(e.target.value.toUpperCase())}
+                onKeyDown={e=>e.key==="Enter"&&analyze()}
+                placeholder="e.g. AAPL"
+                style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border2)",
+                  borderRadius:3,padding:"10px 14px",color:C.blue,fontSize:18,
+                  fontWeight:700,outline:"none",letterSpacing:3,
+                  transition:"border-color .2s"}}/>
             </div>
+            <button onClick={analyze} disabled={loading}
+              style={{background:loading?"transparent":`${C.blue}14`,
+                border:`1px solid ${loading?"var(--border)":C.blue}`,
+                color:loading?"var(--text-dim)":C.blue,
+                borderRadius:3,padding:"10px 24px",fontSize:10,letterSpacing:2,
+                cursor:loading?"not-allowed":"pointer",fontWeight:700,
+                transition:"all .2s",whiteSpace:"nowrap"}}>
+              {loading?"RUNNING…":"▶  ANALYZE"}
+            </button>
+          </div>
+          {prog&&<div style={{marginTop:9,fontSize:9,color:C.blue,opacity:.55,letterSpacing:1}}>◆ {prog}</div>}
+          {error&&(
+            <div style={{marginTop:10,fontSize:11,color:C.red,padding:"8px 12px",
+              background:`${C.red}0A`,borderRadius:3,border:`1px solid ${C.red}28`}}>
+              ✗  {error}
+            </div>
+          )}
+        </Card>
 
-            {/* ── Results ── */}
-            {R && (
+        {/* ── RESULTS ── */}
+        {R&&S&&(
+          <div className="fade">
+
+            {/* ── IDENTITY ROW ── */}
+            <div style={{display:"flex",justifyContent:"space-between",
+              alignItems:"flex-end",marginBottom:18}}>
               <div>
-                {/* Title row */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20 }}>
-                  <div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: "#fff", letterSpacing: 2 }}>{R.ticker}</div>
-                    <div style={{ fontSize: 13, color: R.priceChange >= 0 ? "#00ff88" : "#ff6b6b" }}>
-                      ${R.price.toFixed(2)} · {R.priceChange >= 0 ? "▲" : "▼"} {pct(Math.abs(R.priceChange))}
-                    </div>
-                  </div>
-                  {R.signal && (
-                    <div style={{ border: `2px solid ${R.signal.color}`, borderRadius: 4, padding: "12px 24px", textAlign: "center", background: `${R.signal.color}11`, boxShadow: `0 0 20px ${R.signal.color}22` }}>
-                      <div style={{ fontSize: 10, color: "#555", letterSpacing: 3, marginBottom: 4 }}>SIGNAL</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: R.signal.color, letterSpacing: 2 }}>{R.signal.signal}</div>
-                      <div style={{ fontSize: 10, color: "#444", marginTop: 4 }}>score {R.signal.score}/{R.signal.maxScore}</div>
-                    </div>
-                  )}
+                <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2,marginBottom:4}}>
+                  US EQUITY  ·  DAILY  ·  {R.ts}
+                </div>
+                <div style={{display:"flex",alignItems:"baseline",gap:14}}>
+                  <span style={{fontSize:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
+                  <span style={{fontSize:20,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
+                  <span style={{fontSize:13,color:R.chg>=0?C.teal:C.red}}>
+                    {R.chg>=0?"▲":"▼"} {pct(Math.abs(R.chg))} today
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── SIGNAL BANNER ── */}
+            <div style={{border:`1px solid ${S.aColor}30`,borderRadius:5,
+              background:`${S.aColor}07`,marginBottom:18,overflow:"hidden"}}>
+              {/* top accent line */}
+              <div style={{height:2,background:S.aColor,opacity:.6}}/>
+              <div style={{display:"grid",gridTemplateColumns:"auto 1px 1fr 1px 1fr 1px 1fr",
+                gap:0,alignItems:"center",padding:"20px 28px",gap_:"24px"}}>
+
+                {/* Action */}
+                <div style={{textAlign:"center",paddingRight:28}}>
+                  <Label>Signal</Label>
+                  <BigNum value={S.action} color={S.aColor} size={32}/>
+                  <div style={{fontSize:9,color:"var(--text-dim)",marginTop:5,letterSpacing:2}}>{S.direction}</div>
                 </div>
 
-                {/* Sparklines */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-                  <div style={{ border: "1px solid #1a1a1a", borderRadius: 4, padding: "14px 16px", background: "rgba(0,0,0,0.3)" }}>
-                    <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 8 }}>{R.ticker} · 60-DAY PRICE</div>
-                    <SparkLine data={R.closes} color="#00ff88" height={50} />
-                  </div>
-                  <div style={{ border: "1px solid #1a1a1a", borderRadius: 4, padding: "14px 16px", background: "rgba(0,0,0,0.3)" }}>
-                    <div style={{ fontSize: 10, color: "#444", letterSpacing: 2, marginBottom: 8 }}>SPY · 60-DAY (REGIME PROXY)</div>
-                    <SparkLine data={R.spyCloses} color={R.hmm?.state === "RISK_ON" ? "#00ff88" : "#ff6b6b"} height={50} />
-                  </div>
-                </div>
+                <Divider/>
 
-                {/* Metric cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-                  <MetricCard title="12-1 Momentum" value={R.momentum ? pct(R.momentum) : "N/A"} sub="past 12m excl. 1m"
-                    color={R.momentum > 0.05 ? "#00ff88" : R.momentum > 0 ? "#ffd700" : "#ff6b6b"}
-                    badge={R.momentum > 0 ? { text: "▲ POSITIVE", color: "#00ff88" } : { text: "▼ NEGATIVE", color: "#ff6b6b" }} />
-                  <MetricCard title="Amihud Ratio" value={R.amihud ? R.amihud.toFixed(3) : "N/A"} sub="60-day avg illiquidity"
-                    color={R.amihud < 0.5 ? "#00ff88" : R.amihud < 2.0 ? "#ffd700" : "#ff6b6b"}
-                    badge={R.amihud < 0.5 ? { text: "HIGH LIQUIDITY", color: "#00ff88" } : { text: "LOW LIQUIDITY", color: "#ff6b6b" }} />
-                  <MetricCard title="HMM Regime" value={R.hmm?.state || "N/A"}
-                    sub={`conf. ${R.hmm ? pct(R.hmm.confidence) : "—"} · vol ${R.hmm ? pct(R.hmm.vol20) : "—"}`}
-                    color={R.hmm?.state === "RISK_ON" ? "#00ff88" : "#ff6b6b"} />
-                  <MetricCard title="Kelly f*" value={R.kelly ? pct(R.kelly.fAdj) : "N/A"}
-                    sub={R.kelly ? `win ${pct(R.kelly.p)} · b=${R.kelly.b.toFixed(2)}` : "insufficient data"}
-                    color={R.kelly && R.kelly.fAdj > 0.05 ? "#00ff88" : "#ffd700"}
-                    badge={R.kelly ? { text: `γ=0.33 · raw f*=${pct(R.kelly.fStar)}`, color: "#444" } : null} />
-                </div>
-
-                {/* Risk + Signal breakdown */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
-                  <div style={{ border: "1px solid #1c1c1c", borderRadius: 4, padding: 20, background: "rgba(0,0,0,0.3)" }}>
-                    <div style={{ fontSize: 10, color: "#444", letterSpacing: 3, marginBottom: 16 }}>// RISK — CVaR DECOMPOSITION</div>
-                    {R.cvar && (
-                      <div>
-                        <ProgressBar label="VaR (95%)"  value={pct(R.cvar.var95)} max={0.1} color={R.cvar.var95 < 0.02 ? "#00ff88" : "#ff6b6b"} />
-                        <ProgressBar label="CVaR (95%)" value={pct(R.cvar.cvar)}  max={0.1} color={R.cvar.cvar  < 0.02 ? "#00ff88" : "#ff6b6b"} />
-                        <div style={{ marginTop: 12, fontSize: 10, padding: "8px 12px", borderRadius: 3,
-                          background: R.cvar.safe ? "rgba(0,255,136,0.05)" : "rgba(255,107,107,0.05)",
-                          border: `1px solid ${R.cvar.safe ? "#00ff8822" : "#ff6b6b22"}`,
-                          color: R.cvar.safe ? "#00ff88" : "#ff6b6b" }}>
-                          {R.cvar.safe ? "✓ CVaR within 2% daily limit — position approved" : "⚠ CVaR exceeds 2% daily limit — reduce size"}
-                        </div>
-                        {R.kelly && (
-                          <div style={{ marginTop: 12, fontSize: 11, color: "#555" }}>
-                            Suggested allocation: <span style={{ color: "#ffd700" }}>{pct(Math.min(R.kelly.fAdj, 0.15))}</span> (capped at 15%)
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {/* Score */}
+                <div style={{padding:"0 28px",textAlign:"center"}}>
+                  <Label>Composite Score</Label>
+                  <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:4}}>
+                    <span style={{fontSize:32,fontWeight:700,color:S.aColor}}>{S.score}</span>
+                    <span style={{fontSize:13,color:"var(--text-dim)"}}>/ {S.maxScore}</span>
                   </div>
-
-                  <div style={{ border: "1px solid #1c1c1c", borderRadius: 4, padding: 20, background: "rgba(0,0,0,0.3)" }}>
-                    <div style={{ fontSize: 10, color: "#444", letterSpacing: 3, marginBottom: 16 }}>// ALPHA SCORE BREAKDOWN</div>
-                    {R.signal?.factors.map((f, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #111" }}>
-                        <span style={{ fontSize: 11, color: "#666" }}>{f.label}</span>
-                        <span style={{ fontSize: 11, color: f.color, fontWeight: 600 }}>{f.value}</span>
-                      </div>
-                    ))}
-                    <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-                      <span style={{ color: "#444" }}>TOTAL SCORE</span>
-                      <span style={{ color: R.signal?.color, fontWeight: 700 }}>{R.signal?.score} / {R.signal?.maxScore}</span>
-                    </div>
+                  <div style={{height:3,background:"var(--border)",borderRadius:2,marginTop:10}}>
+                    <div style={{height:"100%",borderRadius:2,background:S.aColor,
+                      width:`${clamp((S.score/S.maxScore)*100,0,100)}%`,
+                      transition:"width 1s ease"}}/>
                   </div>
                 </div>
 
-                {/* HMM detail */}
-                {R.hmm && (
-                  <div style={{ border: "1px solid #1c1c1c", borderRadius: 4, padding: 20, background: "rgba(0,0,0,0.2)", marginBottom: 24 }}>
-                    <div style={{ fontSize: 10, color: "#444", letterSpacing: 3, marginBottom: 12 }}>// HMM REGIME — SPY STATE DECOMPOSITION</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-                      {[
-                        { label: "MA200",              value: R.hmm.ma200?.toFixed(2), color: "#888" },
-                        { label: "MA50",               value: R.hmm.ma50?.toFixed(2),  color: "#888" },
-                        { label: "Realized Vol (ann)", value: pct(R.hmm.vol20),         color: R.hmm.vol20 < 0.20 ? "#00ff88" : "#ff6b6b" },
-                        { label: "State Confidence",   value: pct(R.hmm.confidence),    color: "#ffd700" },
-                      ].map((m, i) => (
-                        <div key={i} style={{ textAlign: "center", padding: "10px 0" }}>
-                          <div style={{ fontSize: 10, color: "#444", marginBottom: 4 }}>{m.label}</div>
-                          <div style={{ fontSize: 16, color: m.color, fontWeight: 700 }}>{m.value}</div>
-                        </div>
+                <Divider/>
+
+                {/* Risk */}
+                <div style={{padding:"0 28px",textAlign:"center"}}>
+                  <Label>Risk Level</Label>
+                  <BigNum value={S.risk} color={S.rColor} size={22}/>
+                  <RiskBar level={S.risk} color={S.rColor}/>
+                  <div style={{fontSize:9,color:"var(--text-dim)",marginTop:7}}>
+                    Ann. Vol  {pct(S.cvar.annVol)}
+                  </div>
+                </div>
+
+                <Divider/>
+
+                {/* Size */}
+                <div style={{padding:"0 0 0 28px"}}>
+                  <Label>Recommended Position</Label>
+                  <BigNum value={S.size.toFixed(1)} unit="% AUM" color={S.aColor} size={32}/>
+                  <SizeBar size={S.size} color={S.aColor}/>
+                </div>
+              </div>
+            </div>
+
+            {/* ── TRADE LEVELS ── */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
+              {[
+                {label:"Entry Price",   value:fmt$(R.price),       color:"var(--text)",
+                 sub:R.chg>=0?`▲ ${pct(Math.abs(R.chg))} today`:`▼ ${pct(Math.abs(R.chg))} today`,
+                 sc:R.chg>=0?C.teal:C.red},
+                {label:"Stop Loss",     value:fmt$(S.stop),        color:C.red,
+                 sub:`−${pct((R.price-S.stop)/R.price)} from entry`,sc:C.red},
+                {label:"Take Profit",   value:fmt$(S.target),      color:C.teal,
+                 sub:`+${pct((S.target-R.price)/R.price)} target`,sc:C.teal},
+                {label:"Risk / Reward", value:`1 : ${S.rr.toFixed(1)}`,color:C.amber,
+                 sub:S.rr>=2?"Favourable ratio":"Tight ratio — review entry",sc:"var(--text-mid)"},
+              ].map((c,i)=>(
+                <Card key={i} style={{borderLeft:`2px solid ${c.color}40`}}>
+                  <Label>{c.label}</Label>
+                  <div style={{fontSize:20,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
+                  <div style={{fontSize:10,color:c.sc,marginTop:7}}>{c.sub}</div>
+                </Card>
+              ))}
+            </div>
+
+            {/* ── CHARTS + FACTORS ── */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
+
+              {/* Sparklines */}
+              <Card>
+                <Label>{R.ticker}  ·  60-Day Price</Label>
+                <Spark data={R.closes} color={S.aColor} h={55}/>
+                <div style={{borderTop:"1px solid var(--border)",marginTop:14,paddingTop:14}}>
+                  <Label>SPY  ·  Regime Proxy</Label>
+                  <Spark data={R.spyC} color={S.hmm.state==="BULL"?C.teal:S.hmm.state==="BEAR"?C.red:C.amber} h={38}/>
+                </div>
+              </Card>
+
+              {/* Factors */}
+              <Card>
+                <Label>Factor Breakdown</Label>
+                {S.factors.map((f,i)=><FactorRow key={i} label={f.label} value={f.value} color={f.color}/>)}
+              </Card>
+            </div>
+
+            {/* ── SCENARIO TABLE ── */}
+            <Card style={{marginBottom:18}}>
+              <Label>Position Sizing  —  Scenario Analysis</Label>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead>
+                    <tr>
+                      {["Scenario","Action","Size %","Kelly γ","Regime","Risk Mult","Stop","Target"].map(h=>(
+                        <th key={h} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,
+                          padding:"0 10px 8px",textAlign:"left",fontWeight:500,
+                          borderBottom:"1px solid var(--border)"}}>
+                          {h}
+                        </th>
                       ))}
-                    </div>
-                    <div style={{ marginTop: 12, fontSize: 10, color: "#333" }}>
-                      Strategy: {R.hmm.state === "RISK_ON"
-                        ? "Normal execution · Kelly sizing active · Momentum overlay ON"
-                        : "Position reduction to 0.5× Kelly · No new entries · Monitor for recovery"}
-                    </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scenarios.map((row,i)=>{
+                      const regM={BULL:1,TRANSITION:.5,BEAR:0}[S.hmm.state]??0;
+                      const rkM={LOW:1,MEDIUM:.75,HIGH:.5,EXTREME:.25}[S.risk];
+                      const sz=clamp(Math.round(S.kelly.fAdj*regM*rkM*row.aMult*1000)/10,0,15);
+                      const active=S.action===row.action;
+                      return(
+                        <tr key={i} className="scenario">
+                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                            fontSize:11,color:active?"var(--text)":"var(--text-mid)",fontWeight:active?600:400}}>
+                            {active&&<span style={{color:S.aColor,marginRight:7}}>►</span>}
+                            {row.label}
+                          </td>
+                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                            fontSize:11,color:row.aColor,fontWeight:600,letterSpacing:1}}>
+                            {row.action}
+                          </td>
+                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                            fontSize:active?15:12,color:active?S.aColor:"var(--text-mid)",fontWeight:active?700:400}}>
+                            {sz.toFixed(1)}%
+                          </td>
+                          {[`${(row.g*100).toFixed(0)}%`,`${(regM*100).toFixed(0)}%`,
+                            `${(rkM*100).toFixed(0)}%`].map((v,j)=>(
+                            <td key={j} style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                              fontSize:11,color:"var(--text-mid)"}}>{v}</td>
+                          ))}
+                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                            fontSize:11,color:C.redLt}}>{fmt$(S.stop)}</td>
+                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                            fontSize:11,color:C.teal}}>{fmt$(S.target)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:10,fontSize:9,color:"var(--text-dim)"}}>
+                ► Active scenario  ·  Size = f* × γ(0.33) × Regime Mult × Risk Mult  ·  Hard cap 15% per position
+              </div>
+            </Card>
+
+            {/* ── ANALYST NOTES ── */}
+            {S.notes.length>0&&(
+              <Card style={{marginBottom:18,borderLeft:`2px solid ${C.amber}40`,
+                background:`${C.amber}05`}}>
+                <Label>Analyst Notes</Label>
+                {S.notes.map((n,i)=>(
+                  <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",
+                    marginBottom:i<S.notes.length-1?8:0}}>
+                    <span style={{color:C.amber,marginTop:1,flexShrink:0}}>◆</span>
+                    <span style={{fontSize:11,color:"var(--text-mid)",lineHeight:1.6}}>{n}</span>
                   </div>
-                )}
-
-                {/* Footer */}
-                <div style={{ fontSize: 10, color: "#2a2a2a", textAlign: "center", paddingTop: 16, borderTop: "1px solid #111" }}>
-                  QUANT EDGE v1.0 · Data: Twelve Data · Analyzed {R.timestamp} · NOT FINANCIAL ADVICE
-                </div>
-              </div>
+                ))}
+              </Card>
             )}
 
-            {/* Empty state */}
-            {!R && !loading && (
-              <div style={{ textAlign: "center", padding: "60px 0", color: "#2a2a2a" }}>
-                <div style={{ fontSize: 40, marginBottom: 16 }}>◈</div>
-                <div style={{ fontSize: 12, letterSpacing: 3 }}>ENTER A TICKER TO BEGIN</div>
+            {/* ── HMM REGIME ── */}
+            <Card style={{marginBottom:4}}>
+              <Label>SPY Regime  —  HMM State Decomposition</Label>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:0}}>
+                {[
+                  {l:"Current State", v:S.hmm.label,          c:S.hmm.state==="BULL"?C.teal:S.hmm.state==="BEAR"?C.red:C.amber},
+                  {l:"Confidence",    v:pct(S.hmm.conf),       c:C.amber},
+                  {l:"SPY  MA200",    v:fmt$(S.hmm.ma200),     c:"var(--text-mid)"},
+                  {l:"SPY  MA50",     v:fmt$(S.hmm.ma50),      c:"var(--text-mid)"},
+                  {l:"Realized Vol",  v:pct(S.hmm.vol),        c:S.hmm.vol<.20?C.teal:S.hmm.vol<.30?C.amber:C.red},
+                ].map((m,i)=>(
+                  <div key={i} style={{textAlign:"center",padding:"12px 8px",
+                    borderRight:i<4?"1px solid var(--border)":"none"}}>
+                    <div style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:7}}>{m.l}</div>
+                    <div style={{fontSize:15,color:m.c,fontWeight:700}}>{m.v}</div>
+                  </div>
+                ))}
               </div>
-            )}
+              <div style={{borderTop:"1px solid var(--border)",marginTop:12,paddingTop:10,
+                fontSize:10,color:"var(--text-dim)"}}>
+                Strategy implication:  {S.hmm.state==="BULL"
+                  ?"Normal execution mode — Kelly sizing active — Momentum overlay ON"
+                  :S.hmm.state==="TRANSITION"
+                  ?"Reduced sizing mode — 0.5× Kelly — New entries require higher conviction"
+                  :"Defensive mode — position reduction — No new long entries"}
+              </div>
+            </Card>
+
+            {/* Footer */}
+            <div style={{fontSize:9,color:"var(--text-dim)",textAlign:"center",
+              marginTop:24,paddingTop:14,borderTop:"1px solid var(--border)"}}>
+              QUANT EDGE v2.0  ·  Data: Twelve Data API  ·  {R.ts}  ·  FOR RESEARCH USE ONLY — NOT FINANCIAL ADVICE
+            </div>
           </div>
-        </div>
-      );
-    }
+        )}
 
-    ReactDOM.createRoot(document.getElementById("root")).render(<QuantDashboard />);
-  </script>
+        {/* Empty state */}
+        {!R&&!loading&&(
+          <div style={{textAlign:"center",padding:"80px 0",color:"var(--text-dim)"}}>
+            <div style={{fontSize:10,letterSpacing:4,marginBottom:12}}>READY</div>
+            <div style={{fontSize:36,color:"var(--border2)",marginBottom:14}}>◈</div>
+            <div style={{fontSize:10,letterSpacing:3,color:"var(--text-dim)"}}>ENTER A TICKER SYMBOL TO BEGIN ANALYSIS</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
 </body>
 </html>
