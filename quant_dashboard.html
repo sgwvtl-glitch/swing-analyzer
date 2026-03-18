@@ -46,12 +46,27 @@
     ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
     /* table row hover */
     tr.scenario:hover td{background:rgba(77,143,214,.04)!important}
+    /* mobile base */
+    @media(max-width:600px){
+      body{font-size:13px;}
+      input{font-size:16px!important;} /* prevent iOS zoom */
+    }
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const {useState,useCallback,useEffect,useRef}=React;
+/* ── responsive hook ─────────────────────────────────── */
+function useIsMobile(bp=640){
+  const [mobile,setMobile]=useState(typeof window!=="undefined"&&window.innerWidth<bp);
+  useEffect(()=>{
+    const h=()=>setMobile(window.innerWidth<bp);
+    window.addEventListener("resize",h);
+    return()=>window.removeEventListener("resize",h);
+  },[bp]);
+  return mobile;
+}
 
 /* ── palette helpers ─────────────────────────────────────── */
 const C={
@@ -381,6 +396,7 @@ const BigNum=({value,unit,color,size=34})=>(
 
 /* ── Main App ─────────────────────────────────────────────── */
 function App(){
+  const isMobile=useIsMobile();
   const [ticker,setTicker]=useState("AAPL");
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState(null);
@@ -492,14 +508,20 @@ function App(){
           </div>
           <span style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>US EQUITY SWING SYSTEM</span>
         </div>
-        <div style={{display:"flex",gap:20}}>
+        {!isMobile&&<div style={{display:"flex",gap:20}}>
           {["MOMENTUM","HMM REGIME","KELLY","CVaR"].map(t=>(
             <span key={t} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>{t}</span>
           ))}
-        </div>
+        </div>}
+        {isMobile&&countdown!==null&&(
+          <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
+            border:"1px solid var(--border)",borderRadius:3,padding:"2px 7px",letterSpacing:1}}>
+            ↺ {countdown}s
+          </span>
+        )}
       </div>
 
-      <div style={{maxWidth:1020,margin:"0 auto",padding:"24px 20px"}}>
+      <div style={{maxWidth:1020,margin:"0 auto",padding:isMobile?"16px 12px":"24px 20px"}}>
 
         {/* ── INPUT PANEL ── */}
         <Card style={{marginBottom:22,padding:"18px 22px",background:"var(--surface2)"}}>
@@ -539,27 +561,25 @@ function App(){
           <div className="fade">
 
             {/* ── IDENTITY ROW ── */}
-            <div style={{display:"flex",justifyContent:"space-between",
-              alignItems:"flex-end",marginBottom:18}}>
-              <div>
-                <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2,marginBottom:4,display:"flex",gap:16,alignItems:"center"}}>
-                  <span>US EQUITY  ·  SWING  1D–2W  ·  {R.ts}</span>
-                  {countdown!==null&&(
-                    <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
-                      background:"var(--surface2)",border:"1px solid var(--border)",
-                      borderRadius:3,padding:"2px 8px",letterSpacing:1.5}}>
-                      AUTO-REFRESH  {countdown}s
-                    </span>
-                  )}
-                </div>
-                <div style={{display:"flex",alignItems:"baseline",gap:14}}>
-                  <span style={{fontSize:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
-                  <span style={{fontSize:20,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
-                  <span style={{fontSize:13,color:R.chg>=0?C.teal:C.red}}>
-                    {R.chg>=0?"▲":"▼"} {pct(Math.abs(R.chg))} today
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:isMobile?9:11,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:5,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                <span>US EQUITY · SWING 1D–2W</span>
+                {!isMobile&&countdown!==null&&(
+                  <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
+                    background:"var(--surface2)",border:"1px solid var(--border)",
+                    borderRadius:3,padding:"2px 8px",letterSpacing:1.5}}>
+                    AUTO-REFRESH {countdown}s
                   </span>
-                </div>
+                )}
               </div>
+              <div style={{display:"flex",alignItems:"baseline",gap:isMobile?8:14,flexWrap:"wrap"}}>
+                <span style={{fontSize:isMobile?28:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
+                <span style={{fontSize:isMobile?16:20,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
+                <span style={{fontSize:isMobile?12:13,color:R.chg>=0?C.teal:C.red}}>
+                  {R.chg>=0?"▲":"▼"} {pct(Math.abs(R.chg))} today
+                </span>
+              </div>
+              <div style={{fontSize:9,color:"var(--text-dim)",marginTop:4}}>{R.ts}</div>
             </div>
 
             {/* ── SIGNAL BANNER ── */}
@@ -567,20 +587,28 @@ function App(){
               background:`${S.aColor}07`,marginBottom:18,overflow:"hidden"}}>
               {/* top accent line */}
               <div style={{height:2,background:S.aColor,opacity:.6}}/>
-              <div style={{display:"grid",gridTemplateColumns:"auto 1px 1fr 1px 1fr 1px 1fr",
-                gap:0,alignItems:"center",padding:"20px 28px",gap_:"24px"}}>
+              <div style={{display:"grid",
+                gridTemplateColumns:isMobile?"1fr 1fr":"auto 1px 1fr 1px 1fr 1px 1fr",
+                gap:isMobile?"1px 0":0,alignItems:"center",
+                padding:isMobile?"16px":"20px 28px"}}>
 
                 {/* Action */}
-                <div style={{textAlign:"center",paddingRight:28}}>
+                <div style={{textAlign:"center",paddingRight:isMobile?0:28,
+                  paddingBottom:isMobile?16:0,
+                  borderBottom:isMobile?"1px solid var(--border)":"none",
+                  gridColumn:isMobile?"1/2":"auto"}}>
                   <Label>Signal</Label>
                   <BigNum value={S.action} color={S.aColor} size={32}/>
                   <div style={{fontSize:9,color:"var(--text-dim)",marginTop:5,letterSpacing:2}}>{S.direction}</div>
                 </div>
 
-                <Divider/>
+                {!isMobile&&<Divider/>}
 
                 {/* Score */}
-                <div style={{padding:"0 28px",textAlign:"center"}}>
+                <div style={{padding:isMobile?"0":"0 28px",textAlign:"center",
+                  paddingBottom:isMobile?16:0,
+                  borderBottom:isMobile?"1px solid var(--border)":"none",
+                  gridColumn:isMobile?"2/3":"auto"}}>
                   <Label>Composite Score</Label>
                   <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:4}}>
                     <span style={{fontSize:32,fontWeight:700,color:S.aColor}}>{S.score}</span>
@@ -593,10 +621,12 @@ function App(){
                   </div>
                 </div>
 
-                <Divider/>
+                {!isMobile&&<Divider/>}
 
                 {/* Risk */}
-                <div style={{padding:"0 28px",textAlign:"center"}}>
+                <div style={{padding:isMobile?"0":"0 28px",textAlign:"center",
+                  paddingTop:isMobile?16:0,
+                  gridColumn:isMobile?"1/2":"auto"}}>
                   <Label>Risk Level</Label>
                   <BigNum value={S.risk} color={S.rColor} size={22}/>
                   <RiskBar level={S.risk} color={S.rColor}/>
@@ -617,7 +647,7 @@ function App(){
             </div>
 
             {/* ── TRADE LEVELS ── */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:10,marginBottom:16}}>
               {[
                 {label:"Entry Price",    value:fmt$(R.price),       color:"var(--text)",
                  sub:R.chg>=0?`▲ ${pct(Math.abs(R.chg))} today`:`▼ ${pct(Math.abs(R.chg))} today`,
@@ -631,14 +661,14 @@ function App(){
               ].map((c,i)=>(
                 <Card key={i} style={{borderLeft:`2px solid ${c.color}40`}}>
                   <Label>{c.label}</Label>
-                  <div style={{fontSize:20,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
-                  <div style={{fontSize:10,color:c.sc,marginTop:7}}>{c.sub}</div>
+                  <div style={{fontSize:isMobile?16:20,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
+                  <div style={{fontSize:isMobile?9:10,color:c.sc,marginTop:6}}>{c.sub}</div>
                 </Card>
               ))}
             </div>
 
             {/* ── CHARTS + FACTORS ── */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:18}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:12,marginBottom:16}}>
 
               {/* Sparklines */}
               <Card>
@@ -664,9 +694,9 @@ function App(){
                 <table style={{width:"100%",borderCollapse:"collapse"}}>
                   <thead>
                     <tr>
-                      {["Scenario","Action","Size %","Kelly γ","Regime","Risk Mult","Stop","Target"].map(h=>(
+                      {(isMobile?["Scenario","Action","Size %","Stop","Target"]:["Scenario","Action","Size %","Kelly γ","Regime","Risk Mult","Stop","Target"]).map(h=>(
                         <th key={h} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,
-                          padding:"0 10px 8px",textAlign:"left",fontWeight:500,
+                          padding:"0 8px 8px",textAlign:"left",fontWeight:500,
                           borderBottom:"1px solid var(--border)"}}>
                           {h}
                         </th>
@@ -694,14 +724,14 @@ function App(){
                             fontSize:active?15:12,color:active?S.aColor:"var(--text-mid)",fontWeight:active?700:400}}>
                             {sz.toFixed(1)}%
                           </td>
-                          {[`${(row.g*100).toFixed(0)}%`,`${(regM*100).toFixed(0)}%`,
+                          {!isMobile&&[`${(row.g*100).toFixed(0)}%`,`${(regM*100).toFixed(0)}%`,
                             `${(rkM*100).toFixed(0)}%`].map((v,j)=>(
                             <td key={j} style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
                               fontSize:11,color:"var(--text-mid)"}}>{v}</td>
                           ))}
-                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                          <td style={{padding:isMobile?"7px 8px":"9px 10px",borderBottom:"1px solid var(--border)",
                             fontSize:11,color:C.redLt}}>{fmt$(S.stop)}</td>
-                          <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
+                          <td style={{padding:isMobile?"7px 8px":"9px 10px",borderBottom:"1px solid var(--border)",
                             fontSize:11,color:C.teal}}>{fmt$(S.target)}</td>
                         </tr>
                       );
@@ -732,7 +762,7 @@ function App(){
             {/* ── HMM REGIME ── */}
             <Card style={{marginBottom:4}}>
               <Label>SPY Regime  —  HMM State Decomposition</Label>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:0}}>
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(5,1fr)",gap:0}}>
                 {[
                   {l:"Current State", v:S.hmm.label,          c:S.hmm.state==="BULL"?C.teal:S.hmm.state==="BEAR"?C.red:C.amber},
                   {l:"Confidence",    v:pct(S.hmm.conf),       c:C.amber},
@@ -741,7 +771,8 @@ function App(){
                   {l:"Realized Vol",  v:pct(S.hmm.vol),        c:S.hmm.vol<.20?C.teal:S.hmm.vol<.30?C.amber:C.red},
                 ].map((m,i)=>(
                   <div key={i} style={{textAlign:"center",padding:"12px 8px",
-                    borderRight:i<4?"1px solid var(--border)":"none"}}>
+                    borderRight:isMobile?(i%2===0?"1px solid var(--border)":"none"):(i<4?"1px solid var(--border)":"none"),
+                    borderBottom:isMobile&&i<4?"1px solid var(--border)":"none"}}>
                     <div style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:7}}>{m.l}</div>
                     <div style={{fontSize:15,color:m.c,fontWeight:700}}>{m.v}</div>
                   </div>
