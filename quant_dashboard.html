@@ -76,136 +76,223 @@ const pct   =(v,d=1)=>`${(v*100).toFixed(d)}%`;
 const clamp =(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const fmt$  =v=>`$${v.toFixed(2)}`;
 
-/* ── quant calculations ──────────────────────────────────── */
-function calcMomentum(c){
-  if(c.length<260)return null;
-  return{mom12_1:(c[21]-c[252])/c[252],mom1m:(c[0]-c[21])/c[21]};
+/* ── quant calculations — tuned for 1-day to 2-week hold ─── */
+
+// ATR(14) — Average True Range, proper measure of daily volatility
+function calcATR(c,h,l,period=14){
+  if(c.length<period+1)return null;
+  const trs=[];
+  for(let i=0;i<period;i++){
+    const hl=h[i]-l[i];
+    const hc=Math.abs(h[i]-c[i+1]);
+    const lc=Math.abs(l[i]-c[i+1]);
+    trs.push(Math.max(hl,hc,lc));
+  }
+  return mean(trs);
 }
+
+// Short-term momentum (5d, 10d) — core signals for 1-2 week holding
+function calcMomentum(c){
+  if(c.length<22)return null;
+  const mom5d  =(c[0]-c[5])/c[5];          // 1-week momentum
+  const mom10d =(c[0]-c[10])/c[10];         // 2-week momentum
+  const mom20d =(c[0]-c[20])/c[20];         // 1-month momentum (trend filter)
+  // Rate of change acceleration: is 5d stronger than 10d?
+  const accel  = mom5d - (mom10d/2);        // positive = accelerating
+  return{mom5d,mom10d,mom20d,accel};
+}
+
+// Amihud illiquidity — use 20d window for swing trading
 function calcAmihud(c,v){
-  const n=Math.min(60,c.length-1),r=[];
+  const n=Math.min(20,c.length-1),r=[];
   for(let i=0;i<n;i++){const dv=v[i]*c[i];if(dv>0)r.push(Math.abs((c[i]-c[i+1])/c[i+1])/dv);}
   return mean(r)*1e9;
 }
+
+// MA trend — use short MAs relevant to 1-2 week holds
 function calcTrend(c){
-  const ma20=mean(c.slice(0,20)),ma50=mean(c.slice(0,50));
-  const ma200=c.length>=200?mean(c.slice(0,200)):null,p=c[0];
-  return{ma20,ma50,ma200,aboveMa20:p>ma20,aboveMa50:p>ma50,aboveMa200:ma200?p>ma200:null};
+  if(c.length<50)return null;
+  const ma5  =mean(c.slice(0,5));
+  const ma10 =mean(c.slice(0,10));
+  const ma20 =mean(c.slice(0,20));
+  const ma50 =mean(c.slice(0,50));
+  const ma200=c.length>=200?mean(c.slice(0,200)):null;
+  const p=c[0];
+  // Slope of MA10 over last 3 days (trend direction)
+  const ma10_3dAgo=mean(c.slice(3,13));
+  const ma10slope=(ma10-ma10_3dAgo)/ma10_3dAgo;
+  return{ma5,ma10,ma20,ma50,ma200,
+    aboveMa5:p>ma5, aboveMa10:p>ma10,
+    aboveMa20:p>ma20, aboveMa50:p>ma50,
+    aboveMa200:ma200?p>ma200:null,
+    ma10slope,                              // positive = uptrend
+    trendAligned:p>ma10&&p>ma20&&ma10>ma20, // short-term stack
+  };
 }
-function calcRSI(c,per=14){
+
+// RSI(7) — more responsive for short-term entries vs RSI(14)
+function calcRSI(c,per=7){
   if(c.length<per+1)return null;
   const ch=c.slice(0,per+1).map((p,i,a)=>i<per?p-a[i+1]:null).filter(v=>v!==null);
   const ag=mean(ch.map(x=>x>0?x:0)),al=mean(ch.map(x=>x<0?-x:0));
   return al===0?100:100-100/(1+ag/al);
 }
-function calcHMM(s){
-  if(s.length<200)return{state:"unknown",confidence:0};
-  const ma200=mean(s.slice(0,200)),ma50=mean(s.slice(0,50)),p=s[0];
-  const rets=s.slice(0,21).map((v,i,a)=>i<20?(v-a[i+1])/a[i+1]:null).filter(Boolean);
-  const vol=std(rets)*Math.sqrt(252);
-  let state,conf,label;
-  if(p>ma200&&p>ma50&&vol<0.18)     {state="BULL";      conf=.88;label="Risk-On";}
-  else if(p<ma200&&p<ma50&&vol>.25) {state="BEAR";      conf=.87;label="Risk-Off";}
-  else if(p>ma200&&p<ma50)          {state="TRANSITION";conf=.60;label="Caution";}
-  else                              {state="TRANSITION";conf=.55;label="Mixed";}
-  return{state,conf,label,ma200,ma50,vol};
+
+// Volume surge — high volume confirms breakout/breakdown
+function calcVolume(v,c){
+  if(v.length<21)return null;
+  const avgVol=mean(v.slice(1,21));         // 20d avg (exclude today)
+  const todayVol=v[0];
+  const ratio=todayVol/avgVol;
+  const dollarVol=todayVol*c[0];
+  return{ratio,avgVol,todayVol,dollarVol,surge:ratio>1.5};
 }
+
+// SPY HMM regime — 2-state, use shorter vol window for swing trading
+function calcHMM(s){
+  if(s.length<50)return{state:"unknown",confidence:0};
+  const ma50 =mean(s.slice(0,50));
+  const ma20 =mean(s.slice(0,20));
+  const ma200=s.length>=200?mean(s.slice(0,200)):null;
+  const p=s[0];
+  const rets=s.slice(0,11).map((v,i,a)=>i<10?(v-a[i+1])/a[i+1]:null).filter(Boolean);
+  const vol10=std(rets)*Math.sqrt(252);     // 10-day vol — more responsive
+  let state,conf,label;
+  if(p>ma50&&p>ma20&&vol10<0.20)            {state="BULL";       conf=.86;label="Risk-On";}
+  else if((!ma200||p<ma200)&&p<ma50&&vol10>.30){state="BEAR";    conf=.85;label="Risk-Off";}
+  else if(p>ma50&&vol10>.25)                {state="TRANSITION"; conf=.62;label="Elevated Vol";}
+  else if(p<ma50&&p>ma20)                   {state="TRANSITION"; conf=.58;label="Caution";}
+  else                                      {state="TRANSITION"; conf=.55;label="Mixed";}
+  return{state,conf,label,ma20,ma50,ma200,vol:vol10};
+}
+
+// Kelly — calibrated on 10-day forward returns (matches 2-week hold target)
 function calcKelly(c){
-  if(c.length<265)return null;
+  if(c.length<120)return null;
   const fwd=[];
-  for(let i=252;i<c.length-5;i++)fwd.push((c[i-5]-c[i])/c[i]);
+  // Use all available 10d windows in past ~100 days
+  for(let i=20;i<Math.min(c.length-10,120);i++)fwd.push((c[i-10]-c[i])/c[i]);
   const w=fwd.filter(r=>r>0),l=fwd.filter(r=>r<0);
   if(!w.length||!l.length)return null;
   const p=w.length/fwd.length,q=1-p,b=mean(w)/Math.abs(mean(l));
   const fStar=(p*b-q)/b;
-  return{p,q,b,fStar,fAdj:Math.max(0,.33*fStar)};
+  return{p,q,b,fStar,fAdj:Math.max(0,.33*fStar),horizon:"10-day"};
 }
+
+// CVaR — use 30d window for swing trading tail risk
 function calcCVaR(c){
-  if(c.length<60)return null;
-  const rets=c.slice(0,61).map((p,i,a)=>i<60?(p-a[i+1])/a[i+1]:null).filter(Boolean);
+  if(c.length<32)return null;
+  const rets=c.slice(0,31).map((p,i,a)=>i<30?(p-a[i+1])/a[i+1]:null).filter(Boolean);
   rets.sort((a,b)=>a-b);
   const cut=Math.floor(rets.length*.05);
   const cvar=Math.abs(mean(rets.slice(0,cut+1))),var95=Math.abs(rets[cut]);
-  return{cvar,var95,annVol:std(rets)*Math.sqrt(252),safe:cvar<.025};
+  // Also compute 5-day max drawdown as swing-specific risk metric
+  const dd5=Math.abs(Math.min(...c.slice(0,5).map((v,i,a)=>i>0?(v-a[0])/a[0]:0)));
+  return{cvar,var95,annVol:std(rets)*Math.sqrt(252),safe:cvar<.030,dd5};
 }
 
-/* ── signal engine ───────────────────────────────────────── */
-function buildSignal(price,mom,amihud,trend,rsi,hmm,kelly,cvar){
-  if(!mom||!kelly||!cvar||!hmm)return null;
+/* ── signal engine — 1-day to 2-week swing framework ────── */
+function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar){
+  if(!mom||!kelly||!cvar||!hmm||!trend)return null;
   let score=0;const notes=[];
-  const{mom12_1,mom1m}=mom;
+  const{mom5d,mom10d,mom20d,accel}=mom;
 
-  // 1. Regime
-  if(hmm.state==="BULL")        score+=3;
-  else if(hmm.state==="TRANSITION"){score+=1;notes.push("Market in transition — reduce position size");}
-  else                          {score-=4;notes.push("Bear regime active — long bias suspended");}
+  // 1. SPY Regime gate (critical filter — always applied first)
+  if(hmm.state==="BULL")             score+=3;
+  else if(hmm.state==="TRANSITION") {score+=1;notes.push("Market in transition — reduce size, higher bar for entry");}
+  else                              {score-=4;notes.push("Bear regime — only high-conviction setups qualify");}
 
-  // 2. 12-1 Momentum
-  if(mom12_1>.15)       score+=2;
-  else if(mom12_1>.05)  score+=1;
-  else if(mom12_1<-.05){score-=2;notes.push("Negative 12-month momentum — adverse trend");}
-  else                  score-=1;
+  // 2. Short-term momentum (5d) — primary swing signal
+  if(mom5d>.04)       {score+=2;notes.push(`Strong 5-day momentum +${pct(mom5d)} — trend continuation`);}
+  else if(mom5d>.015)  score+=1;
+  else if(mom5d<-.04) {score-=2;notes.push(`Negative 5-day momentum ${pct(mom5d)} — avoid long entry`);}
+  else if(mom5d<-.015) score-=1;
 
-  // 3. Short-term reversal
-  if(mom1m<-.08){score+=1;notes.push("Short-term pullback detected — potential entry point");}
-  if(mom1m>.12) {score-=1;notes.push("Short-term overbought — consider waiting for pullback");}
+  // 3. Momentum acceleration (5d vs 10d) — signals near-term thrust
+  if(accel>.02)        {score+=1;notes.push("Momentum accelerating — short-term thrust confirmed");}
+  else if(accel<-.02)  {score-=1;notes.push("Momentum decelerating — potential near-term fade");}
 
-  // 4. MA stack
-  if(trend.aboveMa200&&trend.aboveMa50&&trend.aboveMa20)score+=2;
-  else if(trend.aboveMa200&&trend.aboveMa50)             score+=1;
-  else if(!trend.aboveMa200&&!trend.aboveMa50)          {score-=2;notes.push("Price below MA50 and MA200 — structural downtrend");}
-  else                                                   score-=1;
+  // 4. Short-term MA stack (MA5 > MA10 > MA20) — swing trend structure
+  if(trend.trendAligned&&trend.ma10slope>0)       score+=2;
+  else if(trend.aboveMa10&&trend.aboveMa20)        score+=1;
+  else if(!trend.aboveMa10&&!trend.aboveMa20)     {score-=2;notes.push("Price below MA10 and MA20 — short-term downtrend");}
+  else                                             score-=1;
 
-  // 5. RSI
+  // 5. RSI(7) — short-period RSI for swing timing
   if(rsi!==null){
-    if(rsi<30)     {score+=1;notes.push(`RSI oversold at ${rsi.toFixed(0)} — mean reversion potential`);}
-    else if(rsi>75){score-=2;notes.push(`RSI overbought at ${rsi.toFixed(0)} — momentum exhaustion risk`);}
-    else if(rsi>50) score+=1;
+    if(rsi<25)      {score+=2;notes.push(`RSI(7) deeply oversold at ${rsi.toFixed(0)} — high bounce probability`);}
+    else if(rsi<40) {score+=1;notes.push(`RSI(7) oversold at ${rsi.toFixed(0)} — pullback entry opportunity`);}
+    else if(rsi>80) {score-=2;notes.push(`RSI(7) overbought at ${rsi.toFixed(0)} — wait for consolidation`);}
+    else if(rsi>65)  score-=1;
+    else if(rsi>45)  score+=1;
   }
 
-  // 6. Liquidity
-  if(amihud>5)       {score-=2;notes.push("Low liquidity — significant slippage risk on execution");}
-  else if(amihud<.5)  score+=1;
+  // 6. Volume confirmation — surge on up-day validates breakout
+  if(vol){
+    const priceUp=mom5d>0;
+    if(vol.surge&&priceUp)  {score+=1;notes.push(`Volume surge ${vol.ratio.toFixed(1)}× avg — institutional buying confirmed`);}
+    if(vol.surge&&!priceUp) {score-=1;notes.push(`Volume surge on down-move — distribution signal`);}
+  }
 
-  // 7. CVaR
-  if(!cvar.safe){score-=1;notes.push(`Elevated tail risk: CVaR(95%) = ${pct(cvar.cvar)}`);}
+  // 7. Liquidity filter (same — critical for execution)
+  if(amihud>5)        {score-=2;notes.push("Low liquidity — high slippage, widen stops or skip");}
+  else if(amihud<.5)   score+=1;
 
-  // Action
+  // 8. CVaR tail risk check
+  if(!cvar.safe)      {score-=1;notes.push(`Tail risk elevated: CVaR(95%) = ${pct(cvar.cvar)} — reduce size`);}
+
+  // ── Action determination ─────────────────────────────────
   let action,direction;
-  if(hmm.state==="BEAR"){action=score<-4?"SELL":"REDUCE";direction="FLAT";}
-  else if(score>=7)     {action="BUY";   direction="LONG";}
-  else if(score>=4)     {action="BUY";   direction="LONG";}
-  else if(score>=1)     {action="HOLD";  direction="LONG";}
-  else if(score>=-2)    {action="HOLD";  direction="FLAT";}
-  else                  {action="REDUCE";direction="FLAT";}
+  if(hmm.state==="BEAR"&&score<-3) {action="SELL";  direction="FLAT";}
+  else if(hmm.state==="BEAR")      {action="REDUCE"; direction="FLAT";}
+  else if(score>=8)                {action="BUY";    direction="LONG";}
+  else if(score>=5)                {action="BUY";    direction="LONG";}
+  else if(score>=2)                {action="HOLD";   direction="LONG";}
+  else if(score>=-1)               {action="HOLD";   direction="FLAT";}
+  else                             {action="REDUCE";  direction="FLAT";}
 
-  // Risk
+  // ── Risk level (swing-appropriate thresholds) ─────────────
   const v=cvar.annVol;
-  const risk=v<.20&&hmm.state==="BULL"&&amihud<1?"LOW":v<.30&&hmm.state!=="BEAR"?"MEDIUM":v<.45?"HIGH":"EXTREME";
+  const risk=v<.22&&hmm.state==="BULL"&&amihud<1?"LOW"
+            :v<.35&&hmm.state!=="BEAR"?"MEDIUM"
+            :v<.55?"HIGH":"EXTREME";
 
-  // Position size
+  // ── Position size ────────────────────────────────────────
   const regM={BULL:1,TRANSITION:.5,BEAR:0}[hmm.state]??0;
   const rkM ={LOW:1,MEDIUM:.75,HIGH:.5,EXTREME:.25}[risk];
   const acM ={BUY:1,HOLD:.6,REDUCE:.2,SELL:0}[action]??0;
   const size=clamp(Math.round(kelly.fAdj*regM*rkM*acM*1000)/10,0,15);
 
-  // Levels
-  const atr=cvar.var95*price;
-  const stop=price-atr*3,target=price+atr*6,rr=(atr*6)/(atr*3);
+  // ── ATR-based trade levels (proper ATR, not CVaR proxy) ──
+  // For 1-2 week swing: stop=1.5× ATR, target=3× ATR (2:1 R/R)
+  const atrVal = atr || cvar.var95*price;
+  const stopDist  = atrVal*1.5;
+  const targetDist= atrVal*3.0;
+  const stop  = price - stopDist;
+  const target= price + targetDist;
+  const rr    = targetDist/stopDist;             // always 2.0 with 1.5/3.0
+  const stopPct   = stopDist/price;
+  const targetPct = targetDist/price;
+  // Max holding period hint
+  const holdDays = `1–10 days`;
 
   const aColor=signalColor(action);
   const rColor=riskColor(risk);
 
   return{
-    action,direction,risk,rColor,aColor,size,stop,target,rr,
-    score,maxScore:12,notes,kelly,hmm,cvar,trend,rsi,
-    mom:mom12_1,mom1m,amihud,
+    action,direction,risk,rColor,aColor,size,
+    stop,target,rr,stopPct,targetPct,holdDays,
+    score,maxScore:14,notes,kelly,hmm,cvar,trend,rsi,vol,
+    mom5d,mom10d,mom20d,accel,amihud,
     factors:[
-      {label:"SPY Regime",     value:hmm.label,             color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
-      {label:"12-1 Momentum",  value:pct(mom12_1),          color:mom12_1>.05?C.teal:mom12_1>0?C.amber:C.red},
-      {label:"MA Stack",       value:trend.aboveMa200&&trend.aboveMa50?"Aligned":"Broken", color:trend.aboveMa200&&trend.aboveMa50?C.teal:C.red},
-      {label:"RSI (14)",       value:rsi?rsi.toFixed(1):"—",color:rsi<30?C.teal:rsi>75?C.red:C.amber},
-      {label:"Liquidity",      value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
-      {label:"CVaR (95%)",     value:pct(cvar.cvar),        color:cvar.safe?C.teal:C.red},
+      {label:"SPY Regime",       value:hmm.label,               color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
+      {label:"5-Day Momentum",   value:pct(mom5d),              color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
+      {label:"10-Day Momentum",  value:pct(mom10d),             color:mom10d>.02?C.teal:mom10d>0?C.amber:C.red},
+      {label:"ST MA Stack",      value:trend.trendAligned?"Aligned":"Broken", color:trend.trendAligned?C.teal:C.red},
+      {label:"RSI (7)",          value:rsi?rsi.toFixed(1):"—",  color:rsi<40?C.teal:rsi>65?C.red:C.amber},
+      {label:"Volume",           value:vol?`${vol.ratio.toFixed(1)}× avg`:"—", color:vol?.surge&&mom5d>0?C.teal:vol?.surge&&mom5d<0?C.red:C.amber},
+      {label:"Liquidity",        value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
+      {label:"CVaR (95%)",       value:pct(cvar.cvar),          color:cvar.safe?C.teal:C.red},
     ]
   };
 }
@@ -312,13 +399,17 @@ function App(){
       setProg("Fetching market data…");
       const [tD,spyD]=await Promise.all([fetchTS(ticker.toUpperCase(),300),fetchTS("SPY",300)]);
       setProg("Running quant models…");
-      const c=tD.map(d=>parseFloat(d.close)),v=tD.map(d=>parseFloat(d.volume));
+      const c=tD.map(d=>parseFloat(d.close));
+      const h=tD.map(d=>parseFloat(d.high||d.close));
+      const l=tD.map(d=>parseFloat(d.low||d.close));
+      const v=tD.map(d=>parseFloat(d.volume));
       const sc=spyD.map(d=>parseFloat(d.close));
       const price=c[0];
+      const atr=calcATR(c,h,l,14);
       const sig=buildSignal(
-        price,
+        price,atr,
         calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
-        calcHMM(sc),calcKelly(c),calcCVaR(c)
+        calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c)
       );
       setResult({ticker:ticker.toUpperCase(),price,
         chg:(c[0]-c[1])/c[1],
@@ -350,10 +441,14 @@ function App(){
       (async()=>{
         try{
           const [tD,spyD]=await Promise.all([fetchTS(tickerRef.current.toUpperCase(),300),fetchTS("SPY",300)]);
-          const c=tD.map(d=>parseFloat(d.close)),v=tD.map(d=>parseFloat(d.volume));
+          const c=tD.map(d=>parseFloat(d.close));
+          const h=tD.map(d=>parseFloat(d.high||d.close));
+          const l=tD.map(d=>parseFloat(d.low||d.close));
+          const v=tD.map(d=>parseFloat(d.volume));
           const sc=spyD.map(d=>parseFloat(d.close));
           const price=c[0];
-          const sig=buildSignal(price,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),calcHMM(sc),calcKelly(c),calcCVaR(c));
+          const atr=calcATR(c,h,l,14);
+          const sig=buildSignal(price,atr,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c));
           setResult({ticker:tickerRef.current.toUpperCase(),price,chg:(c[0]-c[1])/c[1],
             closes:c.slice(0,60).reverse(),spyC:sc.slice(0,60).reverse(),
             sig,ts:new Date().toLocaleString()});
@@ -448,7 +543,7 @@ function App(){
               alignItems:"flex-end",marginBottom:18}}>
               <div>
                 <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2,marginBottom:4,display:"flex",gap:16,alignItems:"center"}}>
-                  <span>US EQUITY  ·  DAILY  ·  {R.ts}</span>
+                  <span>US EQUITY  ·  SWING  1D–2W  ·  {R.ts}</span>
                   {countdown!==null&&(
                     <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
                       background:"var(--surface2)",border:"1px solid var(--border)",
@@ -524,15 +619,15 @@ function App(){
             {/* ── TRADE LEVELS ── */}
             <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:18}}>
               {[
-                {label:"Entry Price",   value:fmt$(R.price),       color:"var(--text)",
+                {label:"Entry Price",    value:fmt$(R.price),       color:"var(--text)",
                  sub:R.chg>=0?`▲ ${pct(Math.abs(R.chg))} today`:`▼ ${pct(Math.abs(R.chg))} today`,
                  sc:R.chg>=0?C.teal:C.red},
-                {label:"Stop Loss",     value:fmt$(S.stop),        color:C.red,
-                 sub:`−${pct((R.price-S.stop)/R.price)} from entry`,sc:C.red},
-                {label:"Take Profit",   value:fmt$(S.target),      color:C.teal,
-                 sub:`+${pct((S.target-R.price)/R.price)} target`,sc:C.teal},
-                {label:"Risk / Reward", value:`1 : ${S.rr.toFixed(1)}`,color:C.amber,
-                 sub:S.rr>=2?"Favourable ratio":"Tight ratio — review entry",sc:"var(--text-mid)"},
+                {label:"Stop Loss (1.5× ATR)",  value:fmt$(S.stop), color:C.red,
+                 sub:`−${pct(S.stopPct)} · ATR-based`,sc:C.redLt},
+                {label:"Take Profit (3× ATR)",  value:fmt$(S.target),color:C.teal,
+                 sub:`+${pct(S.targetPct)} · 2:1 R/R`,sc:C.teal},
+                {label:"Hold Period",    value:S.holdDays,          color:C.amber,
+                 sub:`Risk/Reward  1 : ${S.rr.toFixed(1)}`,sc:"var(--text-mid)"},
               ].map((c,i)=>(
                 <Card key={i} style={{borderLeft:`2px solid ${c.color}40`}}>
                   <Label>{c.label}</Label>
@@ -615,7 +710,7 @@ function App(){
                 </table>
               </div>
               <div style={{marginTop:10,fontSize:9,color:"var(--text-dim)"}}>
-                ► Active scenario  ·  Size = f* × γ(0.33) × Regime Mult × Risk Mult  ·  Hard cap 15% per position
+                ► Active scenario  ·  Size = f* × γ(0.33) × Regime Mult × Risk Mult  ·  Kelly calibrated on 10-day fwd returns  ·  Hard cap 15%
               </div>
             </Card>
 
