@@ -138,6 +138,18 @@ async function fetchBars(ticker,interval,range,stEl){
   throw new Error('所有线路均失败：'+lastErr.message);
 }
 
+async function fetchMacro(stEl){
+  if(stEl)stEl.textContent='正在获取宏观数据...';
+  const B='https://api.twelvedata.com';
+  async function px(sym){const r=await fetch(B+'/price?symbol='+sym+'&apikey='+TD_KEY);const d=await r.json();if(!d.price)throw new Error(sym);return parseFloat(d.price);}
+  async function em(sym,n){const r=await fetch(B+'/ema?symbol='+sym+'&interval=1day&time_period='+n+'&outputsize=1&apikey='+TD_KEY);const d=await r.json();if(!d.values||!d.values[0])throw new Error(sym+' ema');return parseFloat(d.values[0].ema);}
+  let sp=null,se=null,qp=null,qe=null,vix=null;
+  try{[sp,se]=await Promise.all([px('SPY'),em('SPY',21)]);}catch(e){}
+  try{[qp,qe]=await Promise.all([px('QQQ'),em('QQQ',21)]);}catch(e){}
+  try{vix=await px('VIX');}catch(e){}
+  return{spyPrice:sp,spyEMA:se,qqqPrice:qp,qqqEMA:qe,vix};
+}
+
 function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
 function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
 function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
