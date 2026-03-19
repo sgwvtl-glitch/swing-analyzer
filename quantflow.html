@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QuantFlow Dual-TF | External Key</title>
+    <title>QuantFlow | Config Shield</title>
+    
     <script src="config.js"></script>
     
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -15,138 +16,50 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
-        const QuantTerminal = () => {
+        const QuantApp = () => {
+            const [hasKey, setHasKey] = useState(true);
             const [ticker, setTicker] = useState('NVDA');
             const [data, setData] = useState(null);
-            const [loading, setLoading] = useState(false);
-            const [countdown, setCountdown] = useState(120);
-            const timerRef = useRef(null);
 
-            const fetchBatchAnalysis = async (symbol) => {
-                // Accessing the key from the external config.js
-                const API_KEY = window.CONFIG?.TWELVE_DATA_API_KEY;
-                
-                if (!API_KEY || API_KEY.includes('YOUR_')) {
-                    alert("Error: API Key missing in config.js");
-                    return;
-                }
-
-                setLoading(true);
-                try {
-                    // SINGLE BATCH CALL: Fetching 1day and 1h intervals simultaneously
-                    const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day,1h&outputsize=100&apikey=${API_KEY}&indicators=ema(20),macd,rsi`;
-                    const res = await fetch(url);
-                    const json = await res.json();
-
-                    // Twelve Data Batch returns an object with interval keys
-                    const dailyArr = json['1day'].values;
-                    const hourlyArr = json['1h'].values;
-
-                    const d = dailyArr[0];
-                    const h = hourlyArr[0];
-
-                    // --- STRATEGIC BIAS (DAILY) ---
-                    const dailyTrend = parseFloat(d.ema20) < parseFloat(d.close) ? 'LONG' : 'SHORT';
-                    
-                    // --- TACTICAL TRIGGER (HOURLY) ---
-                    const hRsi = parseFloat(h.rsi);
-                    const hMacdLine = parseFloat(h.macd);
-                    const hMacdSignal = parseFloat(h.macd_signal);
-                    const hTrigger = hMacdLine > hMacdSignal ? 'BULLISH' : 'BEARISH';
-
-                    // --- HOURLY S/R RANGE ---
-                    const hHigh = Math.max(...hourlyArr.slice(0, 10).map(v => parseFloat(v.high)));
-                    const hLow = Math.min(...hourlyArr.slice(0, 10).map(v => parseFloat(v.low)));
-
-                    setData({
-                        price: parseFloat(h.close),
-                        dailyTrend,
-                        hRsi,
-                        hTrigger,
-                        hHigh, hLow,
-                        score: (dailyTrend === 'LONG' && hTrigger === 'BULLISH') || (dailyTrend === 'SHORT' && hTrigger === 'BEARISH') ? 5 : 2
-                    });
-                    setCountdown(120);
-                } catch (e) { console.error("Batch Fetch Error:", e); }
-                setLoading(false);
-            };
-
-            const handleGo = (e) => { e.preventDefault(); fetchBatchAnalysis(ticker); };
-
+            // 2. CHECK KEY ON MOUNT
             useEffect(() => {
-                timerRef.current = setInterval(() => {
-                    setCountdown(prev => {
-                        if (prev <= 1) { fetchBatchAnalysis(ticker); return 120; }
-                        return prev - 1;
-                    });
-                }, 1000);
-                return () => clearInterval(timerRef.current);
-            }, [ticker]);
+                const key = window.CONFIG?.TWELVE_DATA_API_KEY;
+                if (!key || key === 'PASTE_YOUR_KEY_HERE') {
+                    setHasKey(false);
+                }
+            }, []);
+
+            if (!hasKey) {
+                return (
+                    <div class="flex items-center justify-center min-h-screen p-6">
+                        <div class="bg-red-950 border-2 border-red-500 p-8 rounded-[2.5rem] text-center max-w-sm">
+                            <h2 class="text-3xl font-black text-red-500 mb-4 tracking-tighter uppercase">Key Error</h2>
+                            <p class="text-sm text-red-200 leading-relaxed font-bold">
+                                Missing <span class="bg-red-500/20 px-1">TWELVE_DATA_API_KEY</span> in your <span class="underline">config.js</span> file. 
+                                <br/><br/>
+                                Ensure both files are in the same folder.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div class="max-w-md mx-auto min-h-screen p-6 pt-10 pb-20">
-                    <header class="flex justify-between items-center mb-10 border-b border-slate-800 pb-4">
-                        <h1 class="text-3xl font-black italic tracking-tighter">BATCH_PRO</h1>
-                        <span class="text-blue-500 font-black text-xl">{countdown}s</span>
-                    </header>
-
-                    <form onSubmit={handleGo} class="mb-10 flex gap-2">
-                        <input 
-                            value={ticker} 
-                            onChange={e => setTicker(e.target.value.toUpperCase())}
-                            class="flex-1 bg-slate-900 border-2 border-slate-800 p-5 rounded-3xl font-black text-3xl uppercase outline-none focus:border-blue-500 transition-all"
-                        />
-                        <button type="submit" class="bg-blue-600 px-8 rounded-3xl font-black text-xl">
-                            {loading ? "..." : "GO"}
-                        </button>
-                    </form>
-
-                    {data && (
-                        <div class="space-y-6 animate-in slide-in-from-bottom-8 duration-500">
-                            {/* DAILY BIAS */}
-                            <div class={`p-10 rounded-[3rem] text-center ${data.dailyTrend === 'LONG' ? 'bg-emerald-600' : 'bg-red-900'}`}>
-                                <p class="text-xs font-black uppercase opacity-70 mb-2">Daily Strategic Bias</p>
-                                <div class="text-7xl font-black tracking-tighter italic">{data.dailyTrend}</div>
-                            </div>
-
-                            {/* HOURLY TACTICALS */}
-                            <div class="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800 grid grid-cols-2 gap-6">
-                                <div>
-                                    <p class="text-xs text-slate-500 font-black uppercase mb-2">1H RSI</p>
-                                    <p class="text-4xl font-black">{data.hRsi.toFixed(1)}</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-slate-500 font-black uppercase mb-2">1H MACD</p>
-                                    <p class={`text-xl font-black ${data.hTrigger === 'BULLISH' ? 'text-emerald-400' : 'text-red-400'}`}>{data.hTrigger}</p>
-                                </div>
-                            </div>
-
-                            {/* ENTRY BOX */}
-                            <div class="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800 text-center relative overflow-hidden">
-                                <p class="text-xs text-slate-500 font-black uppercase mb-2">Execution Price</p>
-                                <p class="text-6xl font-black text-blue-500 tracking-tighter mb-4">${data.price.toFixed(2)}</p>
-                                <div class="flex justify-between text-[10px] font-black text-slate-500 border-t border-slate-800 pt-4">
-                                    <span>1H LOW: ${data.hLow.toFixed(2)}</span>
-                                    <span>1H HIGH: ${data.hHigh.toFixed(2)}</span>
-                                </div>
-                            </div>
-
-                            {/* SIGNAL FINAL */}
-                            <div class="bg-blue-600 p-6 rounded-3xl text-center shadow-2xl">
-                                <p class="text-xl font-black uppercase italic">
-                                    {data.score === 5 ? "SIGNAL CONFIRMED: ENTER" : "WAITING FOR 1H ALIGNMENT"}
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                <div class="max-w-md mx-auto p-10 text-center">
+                    <h1 class="text-4xl font-black text-blue-500 italic mb-10">QUANT_ACTIVE</h1>
+                    <div class="bg-slate-900 p-10 rounded-[3rem] border border-slate-800">
+                        <p class="text-xs font-black uppercase text-slate-500 mb-2 tracking-widest">System Status</p>
+                        <p class="text-2xl font-black text-emerald-400">CONFIG_LOADED</p>
+                        <p class="text-[10px] text-slate-600 mt-2">ID: {window.CONFIG.TWELVE_DATA_API_KEY.substring(0,5)}***</p>
+                    </div>
                 </div>
             );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<QuantTerminal />);
+        root.render(<QuantApp />);
     </script>
 </body>
 </html>
