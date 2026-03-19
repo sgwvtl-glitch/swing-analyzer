@@ -489,6 +489,7 @@ function App(){
   const isMobile=useIsMobile();
   const [ticker,setTicker]=useState("AAPL");
   const [loading,setLoading]=useState(false);
+  const [btnState,setBtnState]=useState("idle"); // idle | running | done
   const [error,setError]=useState(null);
   const [result,setResult]=useState(null);
   const [prog,setProg]=useState("");
@@ -500,7 +501,7 @@ function App(){
 
   const analyze=useCallback(async()=>{
     if(!ticker.trim())return;
-    setLoading(true);setError(null);setResult(null);
+    setLoading(true);setBtnState("running");setError(null);setResult(null);
     try{
       setProg("Batch fetching daily + 1h data (2 API calls)…");
       const{tickerDaily:tD,spyDaily:spyD,tickerHourly:h1D}=await fetchAll(ticker.toUpperCase());
@@ -528,7 +529,8 @@ function App(){
         hourly:hc.slice(0,48).reverse(),
         sig,ts:new Date().toLocaleString()});
       startAutoRefresh(ticker.toUpperCase());
-    }catch(e){setError(e.message);}
+      setBtnState("done");
+    }catch(e){setError(e.message);setBtnState("idle");}
     finally{setLoading(false);setProg("");}
   },[ticker,startAutoRefresh]);
 
@@ -627,7 +629,7 @@ function App(){
             <div>
               <Label>Ticker Symbol</Label>
               <input value={ticker}
-                onChange={e=>setTicker(e.target.value.toUpperCase())}
+                onChange={e=>{setTicker(e.target.value.toUpperCase());setBtnState("idle");}}
                 onKeyDown={e=>e.key==="Enter"&&analyze()}
                 placeholder="e.g. AAPL"
                 style={{width:"100%",background:"#1C2535",border:"1px solid #2E3D58",
@@ -636,14 +638,23 @@ function App(){
                   transition:"border-color .2s"}}/>
             </div>
             <button onClick={analyze} disabled={loading}
-              style={{background:loading?`${C.amber}18`:`${C.blue}18`,
-                border:`1px solid ${loading?C.amber:C.blue}`,
-                color:loading?C.amber:C.blue,
+              style={{
+                background: btnState==="running"?`${C.amber}18`
+                          : btnState==="done"   ?`${C.teal}18`
+                          :                      `${C.blue}18`,
+                border: `1px solid ${
+                          btnState==="running"?C.amber
+                        : btnState==="done"   ?C.teal
+                        :                     C.blue}`,
+                color:  btnState==="running"?C.amber
+                      : btnState==="done"   ?C.teal
+                      :                     C.blue,
                 borderRadius:3,padding:"10px 24px",fontSize:12,letterSpacing:2,
                 cursor:loading?"not-allowed":"pointer",fontWeight:700,
-                transition:"all .2s",whiteSpace:"nowrap",
-                opacity:loading?0.85:1}}>
-              {loading?"◆ RUNNING…":"▶  ANALYZE"}
+                transition:"all .2s",whiteSpace:"nowrap"}}>
+              {btnState==="running"?"◆ RUNNING…"
+              :btnState==="done"   ?"✓ DONE"
+              :                    "▶  ANALYZE"}
             </button>
           </div>
           {prog&&<div style={{marginTop:9,fontSize:11,color:C.blue,opacity:.55,letterSpacing:1}}>◆ {prog}</div>}
