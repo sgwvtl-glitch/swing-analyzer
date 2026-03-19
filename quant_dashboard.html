@@ -35,7 +35,7 @@
       --red-lt:   #D47070;
     }
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;}
+    body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;font-size:15px;}
     input,button{font-family:'Courier New',monospace;}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
     @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -327,8 +327,8 @@ const Divider=()=><div style={{width:1,background:"var(--border)",alignSelf:"str
 const FactorRow=({label,value,color})=>(
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
     padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
-    <span style={{fontSize:11,color:"var(--text-mid)"}}>{label}</span>
-    <span style={{fontSize:11,color,fontWeight:600,letterSpacing:.5}}>{value}</span>
+    <span style={{fontSize:13,color:"var(--text-mid)"}}>{label}</span>
+    <span style={{fontSize:13,color,fontWeight:600,letterSpacing:.5}}>{value}</span>
   </div>
 );
 
@@ -368,7 +368,7 @@ const SizeBar=({size,color})=>(
       <div style={{height:"100%",width:`${(size/15)*100}%`,background:color,borderRadius:3,
         transition:"width 1.2s cubic-bezier(.4,0,.2,1)"}}/>
     </div>
-    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,
+    <div style={{display:"flex",justifyContent:"space-between",fontSize:11,
       color:"var(--text-dim)",marginTop:3,letterSpacing:.5}}>
       <span>0%</span><span>5%</span><span>10%</span><span>15%</span>
     </div>
@@ -383,14 +383,14 @@ const Card=({children,style})=>(
 );
 
 const Label=({children})=>(
-  <div style={{fontSize:9,color:"var(--text-dim)",letterSpacing:2.5,
+  <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2.5,
     textTransform:"uppercase",marginBottom:7,fontWeight:500}}>{children}</div>
 );
 
 const BigNum=({value,unit,color,size=34})=>(
   <div style={{display:"flex",alignItems:"baseline",gap:5}}>
     <span style={{fontSize:size,fontWeight:700,color,lineHeight:1,letterSpacing:.5}}>{value}</span>
-    {unit&&<span style={{fontSize:13,color:"var(--text-mid)",fontWeight:400}}>{unit}</span>}
+    {unit&&<span style={{fontSize:15,color:"var(--text-mid)",fontWeight:400}}>{unit}</span>}
   </div>
 );
 
@@ -504,17 +504,17 @@ function App(){
           <div style={{display:"flex",alignItems:"center",gap:7}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:C.blue,
               animation:"pulse 3s infinite",boxShadow:`0 0 6px ${C.blue}`}}/>
-            <span style={{fontSize:11,fontWeight:700,letterSpacing:4,color:C.blue}}>QUANT EDGE</span>
+            <span style={{fontSize:13,fontWeight:700,letterSpacing:4,color:C.blue}}>QUANT EDGE</span>
           </div>
-          <span style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>US EQUITY SWING SYSTEM</span>
+          <span style={{fontSize:11,color:"var(--text-dim)",letterSpacing:1.5}}>US EQUITY SWING SYSTEM</span>
         </div>
         {!isMobile&&<div style={{display:"flex",gap:20}}>
           {["MOMENTUM","HMM REGIME","KELLY","CVaR"].map(t=>(
-            <span key={t} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5}}>{t}</span>
+            <span key={t} style={{fontSize:11,color:"var(--text-dim)",letterSpacing:1.5}}>{t}</span>
           ))}
         </div>}
         {isMobile&&countdown!==null&&(
-          <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
+          <span style={{fontSize:11,color:countdown<=15?C.amber:"var(--text-dim)",
             border:"1px solid var(--border)",borderRadius:3,padding:"2px 7px",letterSpacing:1}}>
             ↺ {countdown}s
           </span>
@@ -533,7 +533,7 @@ function App(){
                 onKeyDown={e=>e.key==="Enter"&&analyze()}
                 placeholder="e.g. AAPL"
                 style={{width:"100%",background:"#1C2535",border:"1px solid #2E3D58",
-                  borderRadius:3,padding:"10px 14px",color:"#E8EDF5",fontSize:18,
+                  borderRadius:3,padding:"10px 14px",color:"#E8EDF5",fontSize:20,
                   fontWeight:700,outline:"none",letterSpacing:3,
                   transition:"border-color .2s"}}/>
             </div>
@@ -541,15 +541,15 @@ function App(){
               style={{background:loading?"transparent":`${C.blue}14`,
                 border:`1px solid ${loading?"var(--border)":C.blue}`,
                 color:loading?"var(--text-dim)":C.blue,
-                borderRadius:3,padding:"10px 24px",fontSize:10,letterSpacing:2,
+                borderRadius:3,padding:"10px 24px",fontSize:12,letterSpacing:2,
                 cursor:loading?"not-allowed":"pointer",fontWeight:700,
                 transition:"all .2s",whiteSpace:"nowrap"}}>
               {loading?"RUNNING…":"▶  ANALYZE"}
             </button>
           </div>
-          {prog&&<div style={{marginTop:9,fontSize:9,color:C.blue,opacity:.55,letterSpacing:1}}>◆ {prog}</div>}
+          {prog&&<div style={{marginTop:9,fontSize:11,color:C.blue,opacity:.55,letterSpacing:1}}>◆ {prog}</div>}
           {error&&(
-            <div style={{marginTop:10,fontSize:11,color:C.red,padding:"8px 12px",
+            <div style={{marginTop:10,fontSize:13,color:C.red,padding:"8px 12px",
               background:`${C.red}0A`,borderRadius:3,border:`1px solid ${C.red}28`}}>
               ✗  {error}
             </div>
@@ -562,10 +562,10 @@ function App(){
 
             {/* ── IDENTITY ROW ── */}
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:isMobile?9:11,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:5,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{fontSize:isMobile?12:14,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:5,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
                 <span>US EQUITY · SWING 1D–2W</span>
                 {!isMobile&&countdown!==null&&(
-                  <span style={{fontSize:9,color:countdown<=15?C.amber:"var(--text-dim)",
+                  <span style={{fontSize:11,color:countdown<=15?C.amber:"var(--text-dim)",
                     background:"var(--surface2)",border:"1px solid var(--border)",
                     borderRadius:3,padding:"2px 8px",letterSpacing:1.5}}>
                     AUTO-REFRESH {countdown}s
@@ -573,13 +573,13 @@ function App(){
                 )}
               </div>
               <div style={{display:"flex",alignItems:"baseline",gap:isMobile?8:14,flexWrap:"wrap"}}>
-                <span style={{fontSize:isMobile?28:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
-                <span style={{fontSize:isMobile?16:20,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
-                <span style={{fontSize:isMobile?12:13,color:R.chg>=0?C.teal:C.red}}>
+                <span style={{fontSize:isMobile?32:40,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
+                <span style={{fontSize:isMobile?18:22,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
+                <span style={{fontSize:isMobile?13:15,color:R.chg>=0?C.teal:C.red}}>
                   {R.chg>=0?"▲":"▼"} {pct(Math.abs(R.chg))} today
                 </span>
               </div>
-              <div style={{fontSize:9,color:"var(--text-dim)",marginTop:4}}>{R.ts}</div>
+              <div style={{fontSize:11,color:"var(--text-dim)",marginTop:4}}>{R.ts}</div>
             </div>
 
             {/* ── SIGNAL BANNER ── */}
@@ -599,7 +599,7 @@ function App(){
                   gridColumn:isMobile?"1/2":"auto"}}>
                   <Label>Signal</Label>
                   <BigNum value={S.action} color={S.aColor} size={32}/>
-                  <div style={{fontSize:9,color:"var(--text-dim)",marginTop:5,letterSpacing:2}}>{S.direction}</div>
+                  <div style={{fontSize:11,color:"var(--text-dim)",marginTop:5,letterSpacing:2}}>{S.direction}</div>
                 </div>
 
                 {!isMobile&&<Divider/>}
@@ -611,8 +611,8 @@ function App(){
                   gridColumn:isMobile?"2/3":"auto"}}>
                   <Label>Composite Score</Label>
                   <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:4}}>
-                    <span style={{fontSize:32,fontWeight:700,color:S.aColor}}>{S.score}</span>
-                    <span style={{fontSize:13,color:"var(--text-dim)"}}>/ {S.maxScore}</span>
+                    <span style={{fontSize:36,fontWeight:700,color:S.aColor}}>{S.score}</span>
+                    <span style={{fontSize:15,color:"var(--text-dim)"}}>/ {S.maxScore}</span>
                   </div>
                   <div style={{height:3,background:"var(--border)",borderRadius:2,marginTop:10}}>
                     <div style={{height:"100%",borderRadius:2,background:S.aColor,
@@ -630,7 +630,7 @@ function App(){
                   <Label>Risk Level</Label>
                   <BigNum value={S.risk} color={S.rColor} size={22}/>
                   <RiskBar level={S.risk} color={S.rColor}/>
-                  <div style={{fontSize:9,color:"var(--text-dim)",marginTop:7}}>
+                  <div style={{fontSize:11,color:"var(--text-dim)",marginTop:7}}>
                     Ann. Vol  {pct(S.cvar.annVol)}
                   </div>
                 </div>
@@ -661,8 +661,8 @@ function App(){
               ].map((c,i)=>(
                 <Card key={i} style={{borderLeft:`2px solid ${c.color}40`}}>
                   <Label>{c.label}</Label>
-                  <div style={{fontSize:isMobile?16:20,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
-                  <div style={{fontSize:isMobile?9:10,color:c.sc,marginTop:6}}>{c.sub}</div>
+                  <div style={{fontSize:isMobile?18:22,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
+                  <div style={{fontSize:isMobile?11:13,color:c.sc,marginTop:6}}>{c.sub}</div>
                 </Card>
               ))}
             </div>
@@ -695,7 +695,7 @@ function App(){
                   <thead>
                     <tr>
                       {(isMobile?["Scenario","Action","Size %","Stop","Target"]:["Scenario","Action","Size %","Kelly γ","Regime","Risk Mult","Stop","Target"]).map(h=>(
-                        <th key={h} style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,
+                        <th key={h} style={{fontSize:11,color:"var(--text-dim)",letterSpacing:1.5,
                           padding:"0 8px 8px",textAlign:"left",fontWeight:500,
                           borderBottom:"1px solid var(--border)"}}>
                           {h}
@@ -712,12 +712,12 @@ function App(){
                       return(
                         <tr key={i} className="scenario">
                           <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
-                            fontSize:11,color:active?"var(--text)":"var(--text-mid)",fontWeight:active?600:400}}>
+                            fontSize:13,color:active?"var(--text)":"var(--text-mid)",fontWeight:active?600:400}}>
                             {active&&<span style={{color:S.aColor,marginRight:7}}>►</span>}
                             {row.label}
                           </td>
                           <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
-                            fontSize:11,color:row.aColor,fontWeight:600,letterSpacing:1}}>
+                            fontSize:13,color:row.aColor,fontWeight:600,letterSpacing:1}}>
                             {row.action}
                           </td>
                           <td style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
@@ -727,19 +727,19 @@ function App(){
                           {!isMobile&&[`${(row.g*100).toFixed(0)}%`,`${(regM*100).toFixed(0)}%`,
                             `${(rkM*100).toFixed(0)}%`].map((v,j)=>(
                             <td key={j} style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
-                              fontSize:11,color:"var(--text-mid)"}}>{v}</td>
+                              fontSize:13,color:"var(--text-mid)"}}>{v}</td>
                           ))}
                           <td style={{padding:isMobile?"7px 8px":"9px 10px",borderBottom:"1px solid var(--border)",
-                            fontSize:11,color:C.redLt}}>{fmt$(S.stop)}</td>
+                            fontSize:13,color:C.redLt}}>{fmt$(S.stop)}</td>
                           <td style={{padding:isMobile?"7px 8px":"9px 10px",borderBottom:"1px solid var(--border)",
-                            fontSize:11,color:C.teal}}>{fmt$(S.target)}</td>
+                            fontSize:13,color:C.teal}}>{fmt$(S.target)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-              <div style={{marginTop:10,fontSize:9,color:"var(--text-dim)"}}>
+              <div style={{marginTop:10,fontSize:11,color:"var(--text-dim)"}}>
                 ► Active scenario  ·  Size = f* × γ(0.33) × Regime Mult × Risk Mult  ·  Kelly calibrated on 10-day fwd returns  ·  Hard cap 15%
               </div>
             </Card>
@@ -753,7 +753,7 @@ function App(){
                   <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start",
                     marginBottom:i<S.notes.length-1?8:0}}>
                     <span style={{color:C.amber,marginTop:1,flexShrink:0}}>◆</span>
-                    <span style={{fontSize:11,color:"var(--text-mid)",lineHeight:1.6}}>{n}</span>
+                    <span style={{fontSize:13,color:"var(--text-mid)",lineHeight:1.6}}>{n}</span>
                   </div>
                 ))}
               </Card>
@@ -773,13 +773,13 @@ function App(){
                   <div key={i} style={{textAlign:"center",padding:"12px 8px",
                     borderRight:isMobile?(i%2===0?"1px solid var(--border)":"none"):(i<4?"1px solid var(--border)":"none"),
                     borderBottom:isMobile&&i<4?"1px solid var(--border)":"none"}}>
-                    <div style={{fontSize:9,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:7}}>{m.l}</div>
-                    <div style={{fontSize:15,color:m.c,fontWeight:700}}>{m.v}</div>
+                    <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:1.5,marginBottom:7}}>{m.l}</div>
+                    <div style={{fontSize:17,color:m.c,fontWeight:700}}>{m.v}</div>
                   </div>
                 ))}
               </div>
               <div style={{borderTop:"1px solid var(--border)",marginTop:12,paddingTop:10,
-                fontSize:10,color:"var(--text-dim)"}}>
+                fontSize:12,color:"var(--text-dim)"}}>
                 Strategy implication:  {S.hmm.state==="BULL"
                   ?"Normal execution mode — Kelly sizing active — Momentum overlay ON"
                   :S.hmm.state==="TRANSITION"
@@ -789,7 +789,7 @@ function App(){
             </Card>
 
             {/* Footer */}
-            <div style={{fontSize:9,color:"var(--text-dim)",textAlign:"center",
+            <div style={{fontSize:11,color:"var(--text-dim)",textAlign:"center",
               marginTop:24,paddingTop:14,borderTop:"1px solid var(--border)"}}>
               QUANT EDGE v2.0  ·  Data: Twelve Data API  ·  {R.ts}  ·  FOR RESEARCH USE ONLY — NOT FINANCIAL ADVICE
             </div>
@@ -799,9 +799,9 @@ function App(){
         {/* Empty state */}
         {!R&&!loading&&(
           <div style={{textAlign:"center",padding:"80px 0",color:"var(--text-dim)"}}>
-            <div style={{fontSize:10,letterSpacing:4,marginBottom:12}}>READY</div>
-            <div style={{fontSize:36,color:"var(--border2)",marginBottom:14}}>◈</div>
-            <div style={{fontSize:10,letterSpacing:3,color:"var(--text-dim)"}}>ENTER A TICKER SYMBOL TO BEGIN ANALYSIS</div>
+            <div style={{fontSize:12,letterSpacing:4,marginBottom:12}}>READY</div>
+            <div style={{fontSize:40,color:"var(--border2)",marginBottom:14}}>◈</div>
+            <div style={{fontSize:12,letterSpacing:3,color:"var(--text-dim)"}}>ENTER A TICKER SYMBOL TO BEGIN ANALYSIS</div>
           </div>
         )}
       </div>
