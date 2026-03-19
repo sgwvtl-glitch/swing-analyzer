@@ -639,16 +639,16 @@ function App(){
             </div>
             <button onClick={analyze} disabled={loading}
               style={{
-                background: btnState==="running"?`${C.amber}18`
-                          : btnState==="done"   ?`${C.teal}18`
-                          :                      `${C.blue}18`,
+                background: btnState==="running"?`${C.amber}22`
+                          : btnState==="done"   ?`${C.teal}22`
+                          : "#FFFFFF",
                 border: `1px solid ${
                           btnState==="running"?C.amber
                         : btnState==="done"   ?C.teal
-                        :                     C.blue}`,
+                        : "#FFFFFF"}`,
                 color:  btnState==="running"?C.amber
                       : btnState==="done"   ?C.teal
-                      :                     C.blue,
+                      : "#111318",
                 borderRadius:3,padding:"10px 24px",fontSize:12,letterSpacing:2,
                 cursor:loading?"not-allowed":"pointer",fontWeight:700,
                 transition:"all .2s",whiteSpace:"nowrap"}}>
