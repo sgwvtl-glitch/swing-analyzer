@@ -23,9 +23,9 @@
       --surface2: #161C28;
       --border:   #1C2232;
       --border2:  #242C3E;
-      --text:     #D4DAE4;
-      --text-dim: #6B778F;
-      --text-mid: #8C97A8;
+      --text:     #E2E7EF;
+      --text-dim: #9BA8BC;
+      --text-mid: #B0BBC9;
       --blue:     #4D8FD6;
       --blue-lt:  #7AAEE0;
       --teal:     #3BB58A;
@@ -206,8 +206,42 @@ function calcCVaR(c){
   return{cvar,var95,annVol:std(rets)*Math.sqrt(252),safe:cvar<.030,dd5};
 }
 
+/* ── 1h quant calculations ───────────────────────────────── */
+
+// 1h momentum: last 4h (half-day), 12h (overnight), 24h (full day)
+function calcMomentum1h(hc){
+  if(!hc||hc.length<25)return null;
+  const mom4h  =(hc[0]-hc[4])/hc[4];
+  const mom12h =(hc[0]-hc[12])/hc[12];
+  const mom24h =(hc[0]-hc[24])/hc[24];
+  // Intraday trend: MA5h vs MA20h
+  const ma5h =mean(hc.slice(0,5));
+  const ma20h=mean(hc.slice(0,20));
+  const trendUp=hc[0]>ma5h&&ma5h>ma20h;
+  const trendDn=hc[0]<ma5h&&ma5h<ma20h;
+  return{mom4h,mom12h,mom24h,ma5h,ma20h,trendUp,trendDn};
+}
+
+// 1h RSI(7) — faster signal for entry timing
+function calcRSI1h(hc,per=7){
+  if(!hc||hc.length<per+1)return null;
+  const ch=hc.slice(0,per+1).map((p,i,a)=>i<per?p-a[i+1]:null).filter(v=>v!==null);
+  const ag=mean(ch.map(x=>x>0?x:0)),al=mean(ch.map(x=>x<0?-x:0));
+  return al===0?100:100-100/(1+ag/al);
+}
+
+// 1h volume: compare last bar vs 20h avg — detects intraday surges
+function calcVol1h(hD){
+  if(!hD||hD.length<21)return null;
+  const hv=hD.map(d=>parseFloat(d.volume||0));
+  const hc=hD.map(d=>parseFloat(d.close));
+  const avg20h=mean(hv.slice(1,21));
+  const ratio=avg20h>0?hv[0]/avg20h:1;
+  return{ratio,surge:ratio>1.8, priceUp:hc[0]>hc[1]};
+}
+
 /* ── signal engine — 1-day to 2-week swing framework ────── */
-function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar){
+function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi1h,vol1h){
   if(!mom||!kelly||!cvar||!hmm||!trend)return null;
   let score=0;const notes=[];
   const{mom5d,mom10d,mom20d,accel}=mom;
@@ -249,11 +283,29 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar){
     if(vol.surge&&!priceUp) {score-=1;notes.push(`Volume surge on down-move — distribution signal`);}
   }
 
-  // 7. Liquidity filter (same — critical for execution)
+  // 7. 1h momentum confirmation — intraday alignment with daily signal
+  if(mom1h){
+    if(mom1h.trendUp&&mom1h.mom4h>.01)  {score+=1;notes.push(`1h trend aligned: +${pct(mom1h.mom4h,1)} past 4h — intraday confirmation`);}
+    if(mom1h.trendDn&&mom1h.mom4h<-.01) {score-=1;notes.push(`1h trend bearish: ${pct(mom1h.mom4h,1)} past 4h — wait for reversal`);}
+  }
+
+  // 8. 1h RSI entry timing — avoid chasing overbought on hourly
+  if(rsi1h!==null){
+    if(rsi1h<25)      {score+=1;notes.push(`1h RSI oversold at ${rsi1h.toFixed(0)} — intraday entry timing favourable`);}
+    else if(rsi1h>80) {score-=1;notes.push(`1h RSI overbought at ${rsi1h.toFixed(0)} — wait for hourly pullback`);}
+  }
+
+  // 9. 1h volume surge — intraday institutional activity
+  if(vol1h){
+    if(vol1h.surge&&vol1h.priceUp)  {score+=1;notes.push(`1h volume surge ${vol1h.ratio.toFixed(1)}× avg on uptick — intraday buying pressure`);}
+    if(vol1h.surge&&!vol1h.priceUp) {score-=1;notes.push(`1h volume surge on downtick — intraday distribution signal`);}
+  }
+
+  // 10. Liquidity filter (same — critical for execution)
   if(amihud>5)        {score-=2;notes.push("Low liquidity — high slippage, widen stops or skip");}
   else if(amihud<.5)   score+=1;
 
-  // 8. CVaR tail risk check
+  // 11. CVaR tail risk check
   if(!cvar.safe)      {score-=1;notes.push(`Tail risk elevated: CVaR(95%) = ${pct(cvar.cvar)} — reduce size`);}
 
   // ── Action determination ─────────────────────────────────
@@ -297,28 +349,66 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar){
   return{
     action,direction,risk,rColor,aColor,size,
     stop,target,rr,stopPct,targetPct,holdDays,
-    score,maxScore:14,notes,kelly,hmm,cvar,trend,rsi,vol,
-    mom5d,mom10d,mom20d,accel,amihud,
+    score,maxScore:17,notes,kelly,hmm,cvar,trend,rsi,vol,
+    mom5d,mom10d,mom20d,accel,amihud,mom1h,rsi1h,vol1h,
     factors:[
-      {label:"SPY Regime",       value:hmm.label,               color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
-      {label:"5-Day Momentum",   value:pct(mom5d),              color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
-      {label:"10-Day Momentum",  value:pct(mom10d),             color:mom10d>.02?C.teal:mom10d>0?C.amber:C.red},
-      {label:"ST MA Stack",      value:trend.trendAligned?"Aligned":"Broken", color:trend.trendAligned?C.teal:C.red},
-      {label:"RSI (7)",          value:rsi?rsi.toFixed(1):"—",  color:rsi<40?C.teal:rsi>65?C.red:C.amber},
-      {label:"Volume",           value:vol?`${vol.ratio.toFixed(1)}× avg`:"—", color:vol?.surge&&mom5d>0?C.teal:vol?.surge&&mom5d<0?C.red:C.amber},
-      {label:"Liquidity",        value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
-      {label:"CVaR (95%)",       value:pct(cvar.cvar),          color:cvar.safe?C.teal:C.red},
+      {label:"SPY Regime",         value:hmm.label,                color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
+      {label:"5D Momentum",        value:pct(mom5d),               color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
+      {label:"10D Momentum",       value:pct(mom10d),              color:mom10d>.02?C.teal:mom10d>0?C.amber:C.red},
+      {label:"MA Stack (daily)",   value:trend.trendAligned?"Aligned":"Broken", color:trend.trendAligned?C.teal:C.red},
+      {label:"RSI-7 (daily)",      value:rsi?rsi.toFixed(1):"—",   color:rsi<40?C.teal:rsi>65?C.red:C.amber},
+      {label:"Volume (daily)",     value:vol?`${vol.ratio.toFixed(1)}×`:"—",   color:vol?.surge&&mom5d>0?C.teal:vol?.surge&&mom5d<0?C.red:C.amber},
+      {label:"1h Momentum (4h)",   value:mom1h?pct(mom1h.mom4h):"—", color:mom1h?.mom4h>.01?C.teal:mom1h?.mom4h<-.01?C.red:C.amber},
+      {label:"1h MA Trend",        value:mom1h?mom1h.trendUp?"↑ Bullish":mom1h.trendDn?"↓ Bearish":"→ Neutral":"—", color:mom1h?.trendUp?C.teal:mom1h?.trendDn?C.red:C.amber},
+      {label:"1h RSI-7",           value:rsi1h!==null?rsi1h.toFixed(1):"—", color:rsi1h<25?C.teal:rsi1h>80?C.red:C.amber},
+      {label:"1h Volume",          value:vol1h?`${vol1h.ratio.toFixed(1)}×`:"—", color:vol1h?.surge&&vol1h?.priceUp?C.teal:vol1h?.surge&&!vol1h?.priceUp?C.red:C.amber},
+      {label:"Liquidity",          value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
+      {label:"CVaR (95%)",         value:pct(cvar.cvar),           color:cvar.safe?C.teal:C.red},
     ]
   };
 }
 
-/* ── API ─────────────────────────────────────────────────── */
+/* ── API — Batch Mode ────────────────────────────────────
+   Call 1: daily data for ticker+SPY in one request (multi-symbol)
+   Call 2: 1h data for ticker only
+   Total: 2 API calls instead of 3, using Promise.all
+──────────────────────────────────────────────────────── */
 const KEY="934f233f1c934c92a767bb9e52191d6d";
-async function fetchTS(sym,n=300){
-  const d=await(await fetch(`https://api.twelvedata.com/time_series?symbol=${sym}&interval=1day&outputsize=${n}&apikey=${KEY}&dp=4`)).json();
-  if(d.status==="error")throw new Error(d.message);
-  if(!d.values?.length)throw new Error("No data: "+sym);
+const BASE="https://api.twelvedata.com/time_series";
+
+// Multi-symbol daily batch: returns {TICKER:{values}, SPY:{values}}
+async function fetchDailyBatch(sym,n=300){
+  const url=`${BASE}?symbol=${sym},SPY&interval=1day&outputsize=${n}&apikey=${KEY}&dp=4`;
+  const d=await(await fetch(url)).json();
+  // If only one symbol returned, d.values exists directly
+  const tickerD = d[sym]||d;
+  const spyD    = d["SPY"]||{};
+  if(tickerD.status==="error") throw new Error(tickerD.message||"Fetch error: "+sym);
+  if(!tickerD.values?.length)  throw new Error("No daily data: "+sym);
+  if(!spyD.values?.length)     throw new Error("No daily data: SPY");
+  return{ticker:tickerD.values, spy:spyD.values};
+}
+
+// 1-hour data for ticker only — ~80 bars ≈ 2 weeks of trading hours
+async function fetch1h(sym,n=80){
+  const url=`${BASE}?symbol=${sym}&interval=1h&outputsize=${n}&apikey=${KEY}&dp=4`;
+  const d=await(await fetch(url)).json();
+  if(d.status==="error") throw new Error(d.message);
+  if(!d.values?.length)  throw new Error("No 1h data: "+sym);
   return d.values;
+}
+
+// Combined batch fetch: 2 parallel requests → 3 datasets
+async function fetchAll(sym){
+  const [daily,hourly]=await Promise.all([
+    fetchDailyBatch(sym,300),
+    fetch1h(sym,80)
+  ]);
+  return{
+    tickerDaily: daily.ticker,
+    spyDaily:    daily.spy,
+    tickerHourly:hourly
+  };
 }
 
 /* ── UI primitives ───────────────────────────────────────── */
@@ -327,7 +417,7 @@ const Divider=()=><div style={{width:1,background:"var(--border)",alignSelf:"str
 const FactorRow=({label,value,color})=>(
   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
     padding:"8px 0",borderBottom:"1px solid var(--border)"}}>
-    <span style={{fontSize:13,color:"var(--text-mid)"}}>{label}</span>
+    <span style={{fontSize:13,color:"#B8C4D4"}}>{label}</span>
     <span style={{fontSize:13,color,fontWeight:600,letterSpacing:.5}}>{value}</span>
   </div>
 );
@@ -383,8 +473,8 @@ const Card=({children,style})=>(
 );
 
 const Label=({children})=>(
-  <div style={{fontSize:11,color:"var(--text-dim)",letterSpacing:2.5,
-    textTransform:"uppercase",marginBottom:7,fontWeight:500}}>{children}</div>
+  <div style={{fontSize:11,color:"#A8B4C8",letterSpacing:2.5,
+    textTransform:"uppercase",marginBottom:7,fontWeight:600}}>{children}</div>
 );
 
 const BigNum=({value,unit,color,size=34})=>(
@@ -412,25 +502,30 @@ function App(){
     if(!ticker.trim())return;
     setLoading(true);setError(null);setResult(null);
     try{
-      setProg("Fetching market data…");
-      const [tD,spyD]=await Promise.all([fetchTS(ticker.toUpperCase(),300),fetchTS("SPY",300)]);
+      setProg("Batch fetching daily + 1h data (2 API calls)…");
+      const{tickerDaily:tD,spyDaily:spyD,tickerHourly:h1D}=await fetchAll(ticker.toUpperCase());
       setProg("Running quant models…");
+      // Daily arrays
       const c=tD.map(d=>parseFloat(d.close));
       const h=tD.map(d=>parseFloat(d.high||d.close));
       const l=tD.map(d=>parseFloat(d.low||d.close));
       const v=tD.map(d=>parseFloat(d.volume));
       const sc=spyD.map(d=>parseFloat(d.close));
+      // 1h arrays
+      const hc=h1D.map(d=>parseFloat(d.close));
       const price=c[0];
       const atr=calcATR(c,h,l,14);
       const sig=buildSignal(
         price,atr,
         calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
-        calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c)
+        calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c),
+        calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D)
       );
       setResult({ticker:ticker.toUpperCase(),price,
         chg:(c[0]-c[1])/c[1],
         closes:c.slice(0,60).reverse(),
         spyC:sc.slice(0,60).reverse(),
+        hourly:hc.slice(0,48).reverse(),
         sig,ts:new Date().toLocaleString()});
       startAutoRefresh(ticker.toUpperCase());
     }catch(e){setError(e.message);}
@@ -456,18 +551,21 @@ function App(){
       // call analyze silently (no result reset to avoid flash)
       (async()=>{
         try{
-          const [tD,spyD]=await Promise.all([fetchTS(tickerRef.current.toUpperCase(),300),fetchTS("SPY",300)]);
+          const{tickerDaily:tD,spyDaily:spyD,tickerHourly:h1D}=await fetchAll(tickerRef.current.toUpperCase());
           const c=tD.map(d=>parseFloat(d.close));
           const h=tD.map(d=>parseFloat(d.high||d.close));
           const l=tD.map(d=>parseFloat(d.low||d.close));
           const v=tD.map(d=>parseFloat(d.volume));
           const sc=spyD.map(d=>parseFloat(d.close));
+          const hc=h1D.map(d=>parseFloat(d.close));
           const price=c[0];
           const atr=calcATR(c,h,l,14);
-          const sig=buildSignal(price,atr,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c));
+          const sig=buildSignal(price,atr,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
+            calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c),
+            calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D));
           setResult({ticker:tickerRef.current.toUpperCase(),price,chg:(c[0]-c[1])/c[1],
             closes:c.slice(0,60).reverse(),spyC:sc.slice(0,60).reverse(),
-            sig,ts:new Date().toLocaleString()});
+            hourly:hc.slice(0,48).reverse(),sig,ts:new Date().toLocaleString()});
         }catch(_){}
       })();
     },120000);
@@ -672,11 +770,15 @@ function App(){
 
               {/* Sparklines */}
               <Card>
-                <Label>{R.ticker}  ·  60-Day Price</Label>
-                <Spark data={R.closes} color={S.aColor} h={55}/>
-                <div style={{borderTop:"1px solid var(--border)",marginTop:14,paddingTop:14}}>
-                  <Label>SPY  ·  Regime Proxy</Label>
-                  <Spark data={R.spyC} color={S.hmm.state==="BULL"?C.teal:S.hmm.state==="BEAR"?C.red:C.amber} h={38}/>
+                <Label>{R.ticker}  ·  60-Day Daily Price</Label>
+                <Spark data={R.closes} color={S.aColor} h={48}/>
+                <div style={{borderTop:"1px solid var(--border)",marginTop:12,paddingTop:12}}>
+                  <Label>{R.ticker}  ·  48-Bar 1H Price</Label>
+                  <Spark data={R.hourly||[]} color={S.mom1h?.trendUp?C.teal:S.mom1h?.trendDn?C.red:C.mid} h={36}/>
+                </div>
+                <div style={{borderTop:"1px solid var(--border)",marginTop:12,paddingTop:12}}>
+                  <Label>SPY  ·  Regime Proxy (Daily)</Label>
+                  <Spark data={R.spyC} color={S.hmm.state==="BULL"?C.teal:S.hmm.state==="BEAR"?C.red:C.amber} h={32}/>
                 </div>
               </Card>
 
@@ -695,8 +797,8 @@ function App(){
                   <thead>
                     <tr>
                       {(isMobile?["Scenario","Action","Size %","Stop","Target"]:["Scenario","Action","Size %","Kelly γ","Regime","Risk Mult","Stop","Target"]).map(h=>(
-                        <th key={h} style={{fontSize:11,color:"var(--text-dim)",letterSpacing:1.5,
-                          padding:"0 8px 8px",textAlign:"left",fontWeight:500,
+                        <th key={h} style={{fontSize:11,color:"#9BA8BC",letterSpacing:1.5,
+                          padding:"0 8px 8px",textAlign:"left",fontWeight:600,
                           borderBottom:"1px solid var(--border)"}}>
                           {h}
                         </th>
@@ -727,7 +829,7 @@ function App(){
                           {!isMobile&&[`${(row.g*100).toFixed(0)}%`,`${(regM*100).toFixed(0)}%`,
                             `${(rkM*100).toFixed(0)}%`].map((v,j)=>(
                             <td key={j} style={{padding:"9px 10px",borderBottom:"1px solid var(--border)",
-                              fontSize:13,color:"var(--text-mid)"}}>{v}</td>
+                              fontSize:13,color:"#B0BBC9"}}>{v}</td>
                           ))}
                           <td style={{padding:isMobile?"7px 8px":"9px 10px",borderBottom:"1px solid var(--border)",
                             fontSize:13,color:C.redLt}}>{fmt$(S.stop)}</td>
