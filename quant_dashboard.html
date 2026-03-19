@@ -636,13 +636,14 @@ function App(){
                   transition:"border-color .2s"}}/>
             </div>
             <button onClick={analyze} disabled={loading}
-              style={{background:loading?"transparent":`${C.blue}14`,
-                border:`1px solid ${loading?"var(--border)":C.blue}`,
-                color:loading?"var(--text-dim)":C.blue,
+              style={{background:loading?`${C.amber}18`:`${C.blue}18`,
+                border:`1px solid ${loading?C.amber:C.blue}`,
+                color:loading?C.amber:C.blue,
                 borderRadius:3,padding:"10px 24px",fontSize:12,letterSpacing:2,
                 cursor:loading?"not-allowed":"pointer",fontWeight:700,
-                transition:"all .2s",whiteSpace:"nowrap"}}>
-              {loading?"RUNNING…":"▶  ANALYZE"}
+                transition:"all .2s",whiteSpace:"nowrap",
+                opacity:loading?0.85:1}}>
+              {loading?"◆ RUNNING…":"▶  ANALYZE"}
             </button>
           </div>
           {prog&&<div style={{marginTop:9,fontSize:11,color:C.blue,opacity:.55,letterSpacing:1}}>◆ {prog}</div>}
