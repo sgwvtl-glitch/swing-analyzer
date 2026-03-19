@@ -573,8 +573,8 @@ function App(){
                 )}
               </div>
               <div style={{display:"flex",alignItems:"baseline",gap:isMobile?8:14,flexWrap:"wrap"}}>
-                <span style={{fontSize:isMobile?32:40,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
-                <span style={{fontSize:isMobile?18:22,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
+                <span style={{fontSize:isMobile?28:36,fontWeight:700,color:"var(--text)",letterSpacing:2}}>{R.ticker}</span>
+                <span style={{fontSize:isMobile?16:20,color:"var(--text-mid)"}}>{fmt$(R.price)}</span>
                 <span style={{fontSize:isMobile?13:15,color:R.chg>=0?C.teal:C.red}}>
                   {R.chg>=0?"▲":"▼"} {pct(Math.abs(R.chg))} today
                 </span>
@@ -611,7 +611,7 @@ function App(){
                   gridColumn:isMobile?"2/3":"auto"}}>
                   <Label>Composite Score</Label>
                   <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:4}}>
-                    <span style={{fontSize:36,fontWeight:700,color:S.aColor}}>{S.score}</span>
+                    <span style={{fontSize:32,fontWeight:700,color:S.aColor}}>{S.score}</span>
                     <span style={{fontSize:15,color:"var(--text-dim)"}}>/ {S.maxScore}</span>
                   </div>
                   <div style={{height:3,background:"var(--border)",borderRadius:2,marginTop:10}}>
@@ -661,7 +661,7 @@ function App(){
               ].map((c,i)=>(
                 <Card key={i} style={{borderLeft:`2px solid ${c.color}40`}}>
                   <Label>{c.label}</Label>
-                  <div style={{fontSize:isMobile?18:22,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
+                  <div style={{fontSize:isMobile?16:20,fontWeight:700,color:c.color,lineHeight:1}}>{c.value}</div>
                   <div style={{fontSize:isMobile?11:13,color:c.sc,marginTop:6}}>{c.sub}</div>
                 </Card>
               ))}
@@ -800,7 +800,7 @@ function App(){
         {!R&&!loading&&(
           <div style={{textAlign:"center",padding:"80px 0",color:"var(--text-dim)"}}>
             <div style={{fontSize:12,letterSpacing:4,marginBottom:12}}>READY</div>
-            <div style={{fontSize:40,color:"var(--border2)",marginBottom:14}}>◈</div>
+            <div style={{fontSize:36,color:"var(--border2)",marginBottom:14}}>◈</div>
             <div style={{fontSize:12,letterSpacing:3,color:"var(--text-dim)"}}>ENTER A TICKER SYMBOL TO BEGIN ANALYSIS</div>
           </div>
         )}
