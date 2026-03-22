@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>波段量化系统 V7.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#030c14;--bg2:#071828;--bg3:#0b2136;
+  --border:#0f3050;--border2:#1a4060;
+  --text:#9bbdd8;--bright:#d8eeff;
+  --green:#00e5a0;--green2:rgba(0,229,160,.12);
+  --red:#ff3b4e;--red2:rgba(255,59,78,.1);
+  --yellow:#ffc200;--yellow2:rgba(255,194,0,.1);
+  --blue:#0099ff;--blue2:rgba(0,153,255,.1);
+  --purple:#b060ff;--purple2:rgba(176,96,255,.1);
+  --dim:#2e4a60;--dim2:#4a6880;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.5;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px);pointer-events:none;z-index:9999}
+
+/* ── HEADER ── */
+.hdr{padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.hdr-title{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3px;color:var(--green);text-transform:uppercase}
+.hdr-sub{font-size:9px;color:var(--dim2);letter-spacing:3px;text-transform:uppercase;margin-top:1px}
+.hdr-ver{font-size:10px;color:var(--blue);background:var(--blue2);border:1px solid var(--blue);padding:3px 10px;letter-spacing:1px}
+
+/* ── INPUT BAR ── */
+.inbar{display:flex;gap:10px;padding:10px 20px;background:var(--bg2);border-bottom:1px solid var(--border);align-items:flex-end;flex-wrap:wrap}
+.inp-grp{display:flex;flex-direction:column;gap:2px}
+.inp-lbl{font-size:9px;color:var(--dim2);letter-spacing:2px;text-transform:uppercase}
+input[type=text]{background:var(--bg);border:1px solid var(--border);color:var(--bright);padding:6px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;transition:border-color .2s}
+input[type=text]:focus{border-color:var(--blue)}
+input[type=text]::placeholder{color:var(--dim)}
+#sym{width:90px;text-transform:uppercase}
+#akey{width:270px}
+.btn{background:var(--green2);border:1px solid var(--green);color:var(--green);padding:7px 22px;font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.btn:hover{background:rgba(0,229,160,.22)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.cs{font-size:10px;color:var(--dim);padding-bottom:1px}
+.cs.live{color:var(--green)}
+
+/* ── STATUS BAR ── */
+.sbar{display:flex;gap:18px;padding:5px 20px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--border);font-size:10px;color:var(--dim2);flex-wrap:wrap}
+.si{display:flex;gap:5px;align-items:center}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);transition:all .3s}
+.dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot.err{background:var(--red)}
+.dot.working{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── MAIN ── */
+#main{padding:14px 20px}
+.loading{display:none;padding:36px;text-align:center;color:var(--blue);font-size:13px;letter-spacing:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.bk{animation:blink 1.2s infinite}
+.report{display:none}
+.err-msg{color:var(--red);padding:14px 16px;background:var(--red2);border:1px solid rgba(255,59,78,.35);font-size:12px;line-height:1.8;margin-top:12px}
+
+/* ── PANELS ── */
+.panel{background:var(--bg2);border:1px solid var(--border);padding:11px 13px}
+.ph{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:3px;text-transform:uppercase;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.tf-badge{font-size:9px;padding:2px 7px;border:1px solid}
+.b1d{color:var(--blue);border-color:var(--blue);background:var(--blue2)}
+.b1h{color:var(--purple);border-color:var(--purple);background:var(--purple2)}
+
+/* ── INDICATOR TABLE ── */
+.itbl{width:100%;border-collapse:collapse}
+.itbl td{padding:3.5px 5px;border-bottom:1px solid rgba(15,48,80,.45);vertical-align:middle;font-size:11px}
+.itbl td:first-child{color:var(--dim2);font-size:9px;letter-spacing:1px;text-transform:uppercase;width:82px;white-space:nowrap}
+.itbl td:nth-child(2){color:var(--bright)}
+.itbl td:last-child{text-align:right;font-size:10px;font-weight:500;white-space:nowrap}
+
+/* ── SIGNAL COLORS ── */
+.bull{color:var(--green)}
+.bear{color:var(--red)}
+.warn{color:var(--yellow)}
+.neu{color:var(--dim2)}
+.blu{color:var(--blue)}
+.pur{color:var(--purple)}
+
+/* ── ANALYSIS GRID ── */
+.agrid{display:grid;grid-template-columns:1fr 300px 1fr;gap:11px;margin-bottom:11px}
+@media(max-width:860px){.agrid{grid-template-columns:1fr}}
+
+/* ── SCORE CENTER ── */
+.scnum{font-family:'Barlow Condensed',sans-serif;font-size:56px;font-weight:900;line-height:1;text-align:center}
+.scdenom{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:400;color:var(--dim2)}
+.sclbl{font-size:9px;letter-spacing:3px;color:var(--dim2);text-transform:uppercase;text-align:center;margin-top:3px}
+.qscore{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--blue);text-align:center;margin-top:2px}
+
+.veto-box{background:var(--red2);border:1px solid rgba(255,59,78,.3);padding:7px 9px;margin-bottom:8px}
+.veto-box .vt{color:var(--red);font-size:10px;padding:1px 0}
+.veto-clear{color:var(--green);font-size:10px;border:1px solid rgba(0,229,160,.25);padding:5px 8px;margin-bottom:8px;background:rgba(0,229,160,.05)}
+
+.sc-item{display:flex;justify-content:space-between;align-items:center;padding:2.5px 0;border-bottom:1px solid rgba(15,48,80,.35);font-size:10px}
+.sc-item-l{color:var(--text)}
+.sc-pass{color:var(--green);font-weight:700}
+.sc-fail{color:var(--dim2)}
+
+.rec-action{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;letter-spacing:3px;text-transform:uppercase;text-align:center;margin-top:10px}
+.rec-buy{color:var(--green)}
+.rec-wait{color:var(--yellow)}
+.rec-no{color:var(--red)}
+.hbadge{display:inline-block;background:var(--blue2);border:1px solid var(--blue);color:var(--blue);padding:3px 12px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;margin-top:5px;width:100%;text-align:center}
+
+/* ── QUANT GRID ── */
+.qgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:11px}
+@media(max-width:700px){.qgrid{grid-template-columns:1fr 1fr}}
+.qm{background:var(--bg2);border:1px solid var(--border);padding:9px 11px}
+.ql{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--dim2);margin-bottom:3px}
+.qv{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;line-height:1}
+.qd{font-size:10px;color:var(--dim2);margin-top:2px}
+
+/* ── TRADE PLAN ── */
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:11px}
+@media(max-width:600px){.tgrid{grid-template-columns:1fr}}
+.ptbl{width:100%;border-collapse:collapse}
+.ptbl td{padding:4px 5px;font-size:11px}
+.ptbl td:first-child{color:var(--dim2);font-size:9px;letter-spacing:1px;text-transform:uppercase;width:60%}
+
+/* ── MACRO BAR ── */
+.mbar{display:flex;gap:10px;margin-bottom:11px}
+.mitem{flex:1;background:var(--bg2);border:1px solid var(--border);padding:8px;text-align:center}
+.mlbl{font-size:9px;letter-spacing:2px;color:var(--dim2);text-transform:uppercase}
+.mval{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;margin-top:3px}
+
+/* ── SECTION TITLE ── */
+.stitle{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--dim2);margin:13px 0 8px;border-bottom:1px solid var(--border);padding-bottom:3px}
+
+/* ── ALERTS ── */
+.alert-red{background:var(--red2);border:1px solid rgba(255,59,78,.35);padding:8px 13px;margin-bottom:10px;font-size:11px;color:var(--red);line-height:1.7}
+.alert-yellow{background:var(--yellow2);border:1px solid rgba(255,194,0,.35);padding:8px 13px;margin-bottom:10px;font-size:11px;color:var(--yellow);line-height:1.7}
+.alert-blue{background:var(--blue2);border:1px solid rgba(0,153,255,.35);padding:8px 13px;margin-bottom:10px;font-size:11px;color:var(--blue);line-height:1.7}
+
+.sym-hdr{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.sym-name{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:900;color:var(--bright)}
+.sym-price{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--blue)}
+.sym-lbl{font-size:9px;color:var(--dim2);letter-spacing:2px}
+
+.footer{font-size:9px;color:var(--dim2);text-align:center;padding:12px;border-top:1px solid var(--border);margin-top:14px;letter-spacing:.5px;line-height:1.8}
+.ts{font-size:9px;color:var(--dim2);text-align:right;margin-top:10px}
+
+/* ── ADX BAR ── */
+.adx-track{height:4px;background:var(--bg3);border-radius:2px;margin-top:4px;overflow:hidden}
+.adx-fill{height:100%;border-radius:2px;transition:width .6s}
+
+/* ── MINI CHART ── */
+.mc{width:100%;height:72px;margin-bottom:8px;overflow:hidden}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-title">📈 波段量化分析系统</div>
+    <div class="hdr-sub">Swing Quant Analyzer · 1–10 Day Strategy · Powered by Twelve Data</div>
+  </div>
+  <div class="hdr-ver">V7.0 · V6.1 + QUANT LAYER</div>
+</div>
+
+<div class="inbar">
+  <div class="inp-grp">
+    <div class="inp-lbl">股票代码</div>
+    <input type="text" id="sym" placeholder="AAPL" maxlength="10">
+  </div>
+  <div class="inp-grp">
+    <div class="inp-lbl">Twelve Data API Key</div>
+    <input type="text" id="akey" placeholder="your_api_key_here">
+  </div>
+  <button class="btn" id="abtn" onclick="startAnalysis()">▶ 分析</button>
+  <div class="cs" id="cs">— 未缓存</div>
+</div>
+
+<div class="sbar">
+  <div class="si"><div class="dot" id="d1d"></div><span id="s1d">1D 日线</span></div>
+  <div class="si"><div class="dot" id="d1h"></div><span id="s1h">1H 小时</span></div>
+  <div class="si"><div class="dot" id="dsm"></div><span id="ssm">SPY / QQQ</span></div>
+  <div class="si"><div class="dot" id="dca"></div><span id="sca">指标计算</span></div>
+  <div class="si" style="margin-left:auto;color:var(--dim2);font-size:9px">
+    API优化: 4并行调用 · 30分钟缓存 · 60根K线
+  </div>
+</div>
+
+<div id="main">
+  <div class="loading" id="loading"><span class="bk">正在并行拉取数据并计算指标...</span></div>
+  <div class="report" id="report"></div>
+  <div id="errbox"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   INDICATOR MATH LIBRARY
+═══════════════════════════════════════════════ */
+
+const parseOHLCV = d => {
+  if (!d?.values?.length) return null;
+  return [...d.values].reverse().map(v => ({
+    dt: v.datetime,
+    o: +v.open, h: +v.high, l: +v.low, c: +v.close,
+    vol: +(v.volume || 0)
+  }));
+};
+
+const computeHA = bars => {
+  const ha = [];
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    const hc = (b.o + b.h + b.l + b.c) / 4;
+    const ho = i === 0 ? (b.o + b.c) / 2 : (ha[i-1].o + ha[i-1].c) / 2;
+    ha.push({ dt:b.dt, o:ho, h:Math.max(b.h,ho,hc), l:Math.min(b.l,ho,hc), c:hc, vol:b.vol });
+  }
+  return ha;
+};
+
+const computeEMA = (vals, p) => {
+  const k = 2/(p+1), out = new Array(vals.length).fill(null);
+  if (vals.length < p) return out;
+  let s = 0; for (let i=0;i<p;i++) s+=vals[i]; out[p-1]=s/p;
+  for (let i=p;i<vals.length;i++) out[i]=vals[i]*k+out[i-1]*(1-k);
+  return out;
+};
+
+const computeRSI = (closes, p) => {
+  const out = new Array(closes.length).fill(null);
+  if (closes.length < p+1) return out;
+  let ag=0, al=0;
+  for (let i=1;i<=p;i++){const d=closes[i]-closes[i-1];if(d>0)ag+=d;else al+=-d;}
+  ag/=p; al/=p;
+  out[p] = 100-100/(1+ag/(al||1e-10));
+  for (let i=p+1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    const g=d>0?d:0, l=d<0?-d:0;
+    ag=(ag*(p-1)+g)/p; al=(al*(p-1)+l)/p;
+    out[i]=100-100/(1+ag/(al||1e-10));
+  }
+  return out;
+};
+
+const computeOBV = bars => {
+  const obv=[0];
+  for (let i=1;i<bars.length;i++){
+    const d=bars[i].c-bars[i-1].c;
+    obv.push(d>0?obv[i-1]+bars[i].vol:d<0?obv[i-1]-bars[i].vol:obv[i-1]);
+  }
+  return obv;
+};
+
+const computeATR = (bars, p=14) => {
+  const tr=[bars[0].h-bars[0].l];
+  for (let i=1;i<bars.length;i++){
+    const {h,l}=bars[i], pc=bars[i-1].c;
+    tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));
+  }
+  const out=new Array(bars.length).fill(null);
+  if (bars.length<p) return out;
+  let s=0;for(let i=0;i<p;i++)s+=tr[i];out[p-1]=s/p;
+  for (let i=p;i<bars.length;i++) out[i]=(out[i-1]*(p-1)+tr[i])/p;
+  return out;
+};
+
+const computeADX = (bars, p=14) => {
+  const n=bars.length;
+  if (n<p*2) return {adx:null,pdi:null,mdi:null};
+  const tr=[],pdm=[],mdm=[];
+  tr.push(bars[0].h-bars[0].l); pdm.push(0); mdm.push(0);
+  for (let i=1;i<n;i++){
+    const H=bars[i].h,L=bars[i].l,pH=bars[i-1].h,pL=bars[i-1].l,pC=bars[i-1].c;
+    tr.push(Math.max(H-L,Math.abs(H-pC),Math.abs(L-pC)));
+    const u=H-pH,d=pL-L;
+    pdm.push(u>d&&u>0?u:0); mdm.push(d>u&&d>0?d:0);
+  }
+  let sTR=tr.slice(0,p).reduce((a,b)=>a+b,0);
+  let sPDM=pdm.slice(0,p).reduce((a,b)=>a+b,0);
+  let sMDM=mdm.slice(0,p).reduce((a,b)=>a+b,0);
+  const dxs=[];
+  for (let i=p;i<n;i++){
+    sTR=sTR-sTR/p+tr[i]; sPDM=sPDM-sPDM/p+pdm[i]; sMDM=sMDM-sMDM/p+mdm[i];
+    const pdi=100*sPDM/(sTR||1), mdi=100*sMDM/(sTR||1);
+    dxs.push({dx:100*Math.abs(pdi-mdi)/((pdi+mdi)||1),pdi,mdi});
+  }
+  if (dxs.length<p) return {adx:null,pdi:null,mdi:null};
+  let adx=dxs.slice(0,p).reduce((a,b)=>a+b.dx,0)/p;
+  let lpdi=dxs[p-1].pdi, lmdi=dxs[p-1].mdi;
+  for (let j=p;j<dxs.length;j++){
+    adx=(adx*(p-1)+dxs[j].dx)/p;
+    lpdi=dxs[j].pdi; lmdi=dxs[j].mdi;
+  }
+  return {adx,pdi:lpdi,mdi:lmdi};
+};
+
+const computeBB = (closes, p=20) => {
+  const n=closes.length;
+  if (n<p) return {upper:null,middle:null,lower:null,pctB:null,width:null};
+  const sl=closes.slice(n-p);
+  const mean=sl.reduce((a,b)=>a+b,0)/p;
+  const std=Math.sqrt(sl.reduce((a,b)=>a+(b-mean)**2,0)/p);
+  const up=mean+2*std, lo=mean-2*std, last=closes[n-1];
+  return {upper:up,middle:mean,lower:lo,pctB:(last-lo)/((up-lo)||1),width:(up-lo)/(mean||1)};
+};
+
+const computeTD9 = bars => {
+  let bc=0, sc=0, lastSig=null;
+  const states=[];
+  for (let i=4;i<bars.length;i++){
+    const c=bars[i].c, c4=bars[i-4].c;
+    if (c<c4){sc=0;bc++;if(bc===9)lastSig={type:'BUY_9',i};}
+    else if (c>c4){bc=0;sc++;if(sc===9)lastSig={type:'SELL_9',i};}
+    else{bc=0;sc=0;}
+    if (i>=bars.length-3) states.push({bc,sc,i});
+  }
+  const last=states[states.length-1]||{bc:0,sc:0};
+  return {bc:last.bc,sc:last.sc,lastSig};
+};
+
+const volMA = (bars, p=20) => {
+  const n=bars.length;
+  if (n<p) return null;
+  return bars.slice(n-p).reduce((a,b)=>a+b.vol,0)/p;
+};
+
+const momZ = (closes, mp=10, zp=20) => {
+  const n=closes.length;
+  if (n<mp+zp) return null;
+  const moms=[];
+  for (let i=mp;i<n;i++) moms.push(closes[i]-closes[i-mp]);
+  if (moms.length<zp) return null;
+  const sl=moms.slice(-zp);
+  const mean=sl.reduce((a,b)=>a+b,0)/zp;
+  const std=Math.sqrt(sl.reduce((a,b)=>a+(b-mean)**2,0)/zp);
+  return std>0?(moms[moms.length-1]-mean)/std:0;
+};
+
+const classifyHA = ha => {
+  const {o,h,l,c}=ha;
+  const bull=c>=o, body=Math.abs(c-o)||0.0001;
+  const uSh=bull?h-c:h-o, lSh=bull?o-l:c-l, thr=body*.15;
+  const uH=uSh>thr, lH=lSh>thr;
+  if (bull){
+    if (!uH&&!lH) return {cn:'强势多头',en:'Strong Bull',col:'green',str:4};
+    if (!uH&&lH)  return {cn:'多头',en:'Bull',col:'green',str:3};
+    if (uH&&!lH)  return {cn:'多头趋弱',en:'Bull Weakening',col:'green',str:2};
+    return {cn:'震荡',en:'Indecision',col:'green',str:1};
+  } else {
+    if (!uH&&!lH) return {cn:'强势空头',en:'Strong Bear',col:'red',str:-4};
+    if (uH&&!lH)  return {cn:'空头',en:'Bear',col:'red',str:-3};
+    if (!uH&&lH)  return {cn:'空头趋弱',en:'Bear Weakening',col:'red',str:-2};
+    return {cn:'震荡',en:'Indecision',col:'red',str:-1};
+  }
+};
+
+const obvTrend = obv => {
+  const n=obv.length; if (n<4) return 'flat';
+  const sl=obv.slice(n-4);
+  let up=0,dn=0;
+  for (let i=1;i<sl.length;i++){if(sl[i]>sl[i-1])up++;else if(sl[i]<sl[i-1])dn++;}
+  if (dn>=3) return 'fall3';
+  if (dn>=2&&up===0) return 'falling';
+  if (up>=2&&dn===0) return 'rising';
+  return 'flat';
+};
+
+const obvVShape = obv => {
+  const sl=obv.slice(-6); if (sl.length<6) return false;
+  const mid=Math.floor(sl.length/2);
+  return sl[0]>sl[mid]&&sl[mid]<sl[sl.length-1];
+};
+
+const rsiDiv = (closes, rsiArr, lb=5) => {
+  const n=closes.length-1;
+  if (!rsiArr[n]||!rsiArr[n-lb]) return {bear:false,bull:false};
+  const pc=closes[n]-closes[n-lb], rrc=rsiArr[n]-rsiArr[n-lb];
+  return {bear:pc>0.5&&rrc<-3, bull:pc<-0.5&&rrc>3};
+};
+
+const emaSlope = (emaArr) => {
+  const n=emaArr.length-1;
+  if (!emaArr[n]||!emaArr[n-3]) return 'flat';
+  return emaArr[n]>emaArr[n-3]?'rising':emaArr[n]<emaArr[n-3]?'falling':'flat';
+};
+
+/* ═══════════════════════════════════════════════
+   MAIN ANALYSIS ENGINE
+═══════════════════════════════════════════════ */
+
+const analyze = (b1D, b1H, bSpy, bQqq) => {
+  if (!b1D||!b1H) return null;
+  const h1D=computeHA(b1D), h1H=computeHA(b1H);
+  const c1D=b1D.map(b=>b.c), c1H=b1H.map(b=>b.c);
+  const n=b1D.length-1, m=b1H.length-1;
+
+  const e8d=computeEMA(c1D,8), e8h=computeEMA(c1H,8);
+  const r5d=computeRSI(c1D,5), r13d=computeRSI(c1D,13), r34d=computeRSI(c1D,34);
+  const r5h=computeRSI(c1H,5), r13h=computeRSI(c1H,13), r34h=computeRSI(c1H,34);
+  const obv1D=computeOBV(b1D), obv1H=computeOBV(b1H);
+  const atr1D=computeATR(b1D,14);
+  const adx1D=computeADX(b1D,14);
+  const bb1D=computeBB(c1D,20);
+  const td9d=computeTD9(b1D), td9h=computeTD9(b1H);
+  const vm1D=volMA(b1D), vm1H=volMA(b1H);
+  const mz1D=momZ(c1D);
+
+  const ha1D=classifyHA(h1D[n]), ha1H=classifyHA(h1H[m]);
+  const spyHA=bSpy?.length?classifyHA(computeHA(bSpy).slice(-1)[0]):null;
+  const qqqHA=bQqq?.length?classifyHA(computeHA(bQqq).slice(-1)[0]):null;
+
+  const price=b1D[n].c;
+  const ed1D=e8d[n]?((price-e8d[n])/e8d[n]*100):null;
+  const ed1H=e8h[m]?((c1H[m]-e8h[m])/e8h[m]*100):null;
+
+  const otr1D=obvTrend(obv1D), otr1H=obvTrend(obv1H);
+  const ovsh1H=obvVShape(obv1H);
+
+  const div1D=rsiDiv(c1D,r13d), div1H=rsiDiv(c1H,r13h);
+  const es1D=emaSlope(e8d), es1H=emaSlope(e8h);
+
+  // Price-OBV divergence check
+  const pobvDiv1D = n>=5 ? (c1D[n]>c1D[n-5]&&obv1D[n]<obv1D[n-5]) : false;
+
+  // RSI alignment
+  const rsiAl1D=(r5d[n]>r13d[n]&&r13d[n]>r34d[n])?'bull':(r5d[n]<r13d[n]&&r13d[n]<r34d[n])?'bear':'mixed';
+  const rsiAl1H=(r5h[m]>r13h[m]&&r13h[m]>r34h[m])?'bull':(r5h[m]<r13h[m]&&r13h[m]<r34h[m])?'bear':'mixed';
+
+  // RSI13 1H rising (3-bar)
+  const r13hRising=r13h[m]&&r13h[m-3]?r13h[m]>r13h[m-3]:false;
+
+  // Vol vs MA
+  const vvm1D=vm1D?b1D[n].vol/vm1D:null;
+  const vvm1H=vm1H?b1H[m].vol/vm1H:null;
+
+  return {
+    price, dt1D:b1D[n].dt,
+    ha1D, ha1H, spyHA, qqqHA,
+    e8d:e8d[n], e8h:e8h[m], ed1D, ed1H, es1D, es1H,
+    r5d:r5d[n], r13d:r13d[n], r34d:r34d[n],
+    r5h:r5h[m], r13h:r13h[m], r34h:r34h[m], r13hRising,
+    rsiAl1D, rsiAl1H, div1D, div1H,
+    obv1D:obv1D[n], obv1H:obv1H[m], otr1D, otr1H, ovsh1H, pobvDiv1D,
+    obvCDrop:otr1D==='fall3',
+    vvm1D, vvm1H,
+    td9d, td9h,
+    atr1D:atr1D[n], adx1D, bb1D, mz1D,
+    ha1DArr:h1D.slice(-20), ha1HArr:h1H.slice(-20),
+    vols1D:b1D.slice(-5).map(b=>b.vol), vols1H:b1H.slice(-5).map(b=>b.vol)
+  };
+};
+
+/* ═══════════════════════════════════════════════
+   V6.1 SCORING ENGINE
+═══════════════════════════════════════════════ */
+
+const scoreV61 = a => {
+  const veto=[], items=[];
+  let score=0;
+
+  // VETO checks
+  if ((a.r5h||0)>75)                                veto.push('RSI(5) 1H > 75');
+  if (a.ha1D.col==='red')                           veto.push('1D HA 当日确认为红色');
+  if (a.ha1D.col!==a.ha1H.col)                      veto.push('1D 与 1H 趋势方向冲突');
+  if (a.td9d.lastSig?.type==='SELL_9')              veto.push('1D TD9 SELL-9 已确认');
+  if (a.spyHA?.col==='red'&&a.qqqHA?.col==='red')   veto.push('SPY + QQQ 同为红色 — 宏观一票否决');
+
+  const add = (lbl, pass, pts) => { items.push({lbl,pass,pts}); if(pass) score+=pts; };
+
+  // 1D layer (5pts max)
+  add('1D HA 绿色确认',          a.ha1D.col==='green',                                         2);
+  add('1D/1H 趋势一致',           a.ha1D.col===a.ha1H.col,                                      2);
+  add('1D OBV 上升，无背离',      a.otr1D==='rising'&&!a.pobvDiv1D,                             1);
+  // 1H layer (5pts max)
+  add('RSI(5) 1H < 75',          (a.r5h||0)<75,                                                1);
+  add('RSI(5) 1H 在 45–65',      (a.r5h||0)>=45&&(a.r5h||0)<=65,                              1);
+  add('RSI(13) 1H 50–65 且上升', (a.r13h||0)>=50&&(a.r13h||0)<=65&&a.r13hRising,              1);
+  add('价格在 1H EMA(8) 上方',   (a.ed1H||0)>0,                                                1);
+  add('入场量 ≥ 1H MA20',        (a.vvm1H||0)>=1.0,                                            1);
+
+  // Bonus
+  const bonus=[];
+  if (a.td9d.bc===9||a.td9d.lastSig?.type==='BUY_9') bonus.push('1D TD9 底部 Buy-9 确认');
+  if (a.ovsh1H)              bonus.push('1H OBV V形恢复');
+  if (a.ha1D.str===4)        bonus.push('1D HA 绿色无上影线（强势实体）');
+  if (a.rsiAl1D==='bull')    bonus.push('RSI 三线多头排列 (1D)');
+  if ((a.r34d||0)>50)        bonus.push('1D RSI(34) > 50 — 中期偏多');
+  if (!a.div1D.bear)         bonus.push('RSI(13) 无看跌背离 (1D)');
+  if (a.spyHA?.col==='green'&&a.qqqHA?.col==='green') bonus.push('宏观背景确认 (SPY+QQQ 同绿)');
+
+  // Threshold adjustments
+  let thr=6, maxPos='full';
+  if (a.obvCDrop){thr=9;maxPos='half';}
+  else if (a.spyHA&&a.qqqHA&&a.spyHA.col!==a.qqqHA.col) thr=8;
+
+  // Recommendation
+  let rec, recCls;
+  if (veto.length>0){rec='不入场 — 一票否决';recCls='no';}
+  else if (score>=9){rec=maxPos==='full'?'全仓入场':'半仓入场（OBV限制）';recCls='buy';}
+  else if (score>=7){rec='半仓试探性入场';recCls='buy';}
+  else if (score===6){rec='四分之一仓，严格止损';recCls='wait';}
+  else{rec='等待 — 信号不足';recCls='wait';}
+
+  return {veto,items,score,bonus,rec,recCls,thr,maxPos};
+};
+
+/* ═══════════════════════════════════════════════
+   QUANT ENHANCEMENT LAYER
+═══════════════════════════════════════════════ */
+
+const scoreQuant = a => {
+  let qs=0; const items=[];
+
+  // ADX trend strength (0-2)
+  const av=a.adx1D.adx;
+  const ap=av>=30?2:av>=25?1:0; qs+=ap;
+  items.push({lbl:'ADX(14) 趋势强度',val:av?av.toFixed(1):'N/A',pts:ap,max:2,
+    detail:av?av>=30?'强势趋势':av>=25?'趋势发展中':av>=20?'弱趋势':'震荡市':'N/A'});
+
+  // BB %B position (0-1)
+  const bb=a.bb1D.pctB;
+  const bp=bb!==null&&bb<0.5?1:0; qs+=bp;
+  items.push({lbl:'BB %B 价格位置',val:bb!==null?(bb*100).toFixed(0)+'%B':'N/A',pts:bp,max:1,
+    detail:bb!==null?bb<0.3?'近下轨，弹升空间大':bb<0.5?'下半区，有空间':'上半区，注意追高':'N/A'});
+
+  // Momentum Z-score (0-2)
+  const mz=a.mz1D;
+  const mp=mz!==null?mz>=1?2:mz>=0.5?1:0:0; qs+=mp;
+  items.push({lbl:'动量 Z-Score',val:mz!==null?mz.toFixed(2):'N/A',pts:mp,max:2,
+    detail:mz!==null?mz>=1?'强上行动量':mz>=0.5?'温和上行动量':mz<0?'动量偏负':'中性':'N/A'});
+
+  // Volume surge (0-1)
+  const vs=(a.vvm1D||0)>=2.0?1:0; qs+=vs;
+  items.push({lbl:'成交量爆发',val:a.vvm1D?(a.vvm1D*100).toFixed(0)+'%':'N/A',pts:vs,max:1,
+    detail:a.vvm1D?a.vvm1D>=2?'爆发确认 ≥ 200%':a.vvm1D>=1.2?'放量':'正常量':'N/A'});
+
+  // Holding horizon based on ADX
+  let horizon;
+  if (av&&av>=30&&a.ha1D.col==='green') horizon='5–10 日';
+  else if (av&&av>=20) horizon='2–5 日';
+  else horizon='1–2 日（震荡市）';
+
+  return {qs,items,horizon,adxDir:a.adx1D.pdi>a.adx1D.mdi?'多头方向':'空头方向'};
+};
+
+/* ═══════════════════════════════════════════════
+   ATR TRADE PLAN
+═══════════════════════════════════════════════ */
+
+const tradePlan = (a, v61score) => {
+  if (!a.atr1D||!a.price) return null;
+  const p=a.price, atr=a.atr1D;
+  const s1=p-2.0*atr, s2=p-1.5*atr, s3=p-1.0*atr;
+  const R=p-s2;
+  const t1=p+1.5*R, t2=p+2.5*R;
+  const pos=v61score>=9?100:v61score>=7?50:v61score===6?25:0;
+  return {p,atr,R,s1,s2,s3,t1,t2,pos};
+};
+
+/* ═══════════════════════════════════════════════
+   MINI CANDLE CHART (SVG)
+═══════════════════════════════════════════════ */
+
+const miniChart = haArr => {
+  const data=haArr.slice(-20);
+  const W=280,H=68,pd=2;
+  const prices=data.flatMap(c=>[c.h,c.l]);
+  const lo=Math.min(...prices), hi=Math.max(...prices);
+  const rng=hi-lo||1;
+  const bw=(W-pd*2)/data.length;
+  const y=p=>H-pd-((p-lo)/rng)*(H-pd*2);
+  let s=`<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`;
+  // grid lines
+  s+=`<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#0f3050" stroke-width="0.5"/>`;
+  data.forEach((c,i)=>{
+    const x=pd+i*bw, bx=x+bw*.15, bodyW=bw*.7;
+    const col=c.c>=c.o?'#00e5a0':'#ff3b4e';
+    const oy=y(c.o),cy=y(c.c),hy=y(c.h),ly=y(c.l);
+    const top=Math.min(oy,cy), bh=Math.max(Math.abs(cy-oy),1), mid=bx+bodyW/2;
+    s+=`<line x1="${mid}" y1="${hy}" x2="${mid}" y2="${ly}" stroke="${col}" stroke-width="0.8" opacity="0.6"/>`;
+    s+=`<rect x="${bx}" y="${top}" width="${bodyW}" height="${bh}" fill="${col}" opacity="0.82" rx="0.4"/>`;
+  });
+  s+='</svg>';
+  return s;
+};
+
+/* ═══════════════════════════════════════════════
+   HELPERS & FORMATTERS
+═══════════════════════════════════════════════ */
+
+const f=(v,d=2)=>v!=null&&!isNaN(v)?v.toFixed(d):'—';
+const fc=c=>c==='green'?'bull':c==='red'?'bear':'neu';
+
+const td9Str = t => {
+  if (t.lastSig?.type==='BUY_9') return ['底部 Buy-9 已确认','bull'];
+  if (t.lastSig?.type==='SELL_9') return ['SELL-9 已确认','bear'];
+  if (t.bc>0) return [`买入计数: ${t.bc}/9`,'blu'];
+  if (t.sc>0) return [`卖出计数: ${t.sc}/9`,'warn'];
+  return ['无活跃计数','neu'];
+};
+
+const obvLabel = t => t==='rising'?'上升↑':t==='falling'?'下降↓':t==='fall3'?'持续下降⚠️':'持平→';
+
+const rsiRegion = v => v>70?'超买区':v>55?'强势区':v>45?'中性区':v>30?'弱势区':'超卖区';
+
+const rsiAlignLabel = a => a==='bull'?'多头排列 ✓':a==='bear'?'空头排列':'混乱/中性';
+
+/* ═══════════════════════════════════════════════
+   REPORT RENDERER
+═══════════════════════════════════════════════ */
+
+const renderReport = (a, v61, qsc, plan, sym) => {
+  const {veto,items,score,bonus,rec,recCls}=v61;
+  const {qs,items:qi,horizon,adxDir}=qsc;
+  const scoreCol=score>=9?'var(--green)':score>=7?'var(--yellow)':'var(--red)';
+
+  const macroStatus=()=>{
+    if (!a.spyHA||!a.qqqHA) return ['未知','neu'];
+    if (a.spyHA.col==='green'&&a.qqqHA.col==='green') return ['宏观顺风 ✓','bull'];
+    if (a.spyHA.col==='red'&&a.qqqHA.col==='red') return ['宏观一票否决 ✗','bear'];
+    return ['方向分歧 △','warn'];
+  };
+  const [mstat,msc]=macroStatus();
+  const [td9ds,td9dc]=td9Str(a.td9d);
+  const [td9hs,td9hc]=td9Str(a.td9h);
+  const esLabel=e=>e==='rising'?'↑上升':e==='falling'?'↓下降':'→持平';
+
+  return `
+<div class="sym-hdr">
+  <div class="sym-name">${sym}</div>
+  <div class="sym-price">$${f(a.price)}</div>
+  <div class="sym-lbl">波段量化系统 V7.0 · V6.1 + QUANT</div>
+</div>
+
+<div class="stitle">宏观背景 / MACRO FILTER</div>
+<div class="mbar">
+  <div class="mitem">
+    <div class="mlbl">SPY 1D HA</div>
+    <div class="mval ${fc(a.spyHA?.col)}">${a.spyHA?a.spyHA.col==='green'?'🟢':'🔴':'❓'} ${a.spyHA?.cn||'未知'}</div>
+  </div>
+  <div class="mitem">
+    <div class="mlbl">QQQ 1D HA</div>
+    <div class="mval ${fc(a.qqqHA?.col)}">${a.qqqHA?a.qqqHA.col==='green'?'🟢':'🔴':'❓'} ${a.qqqHA?.cn||'未知'}</div>
+  </div>
+  <div class="mitem" style="flex:2">
+    <div class="mlbl">综合判断</div>
+    <div class="mval ${msc}" style="font-size:20px">${mstat}</div>
+  </div>
+</div>
+
+<div class="stitle">技术指标分析 / TECHNICAL ANALYSIS</div>
+<div class="agrid">
+
+  <!-- 1D PANEL -->
+  <div class="panel">
+    <div class="ph">日线分析 <span class="tf-badge b1d">1D</span></div>
+    <div class="mc">${miniChart(a.ha1DArr)}</div>
+    <table class="itbl">
+      <tr><td>HA 蜡烛</td><td>${a.ha1D.cn}</td><td class="${fc(a.ha1D.col)}">${a.ha1D.col==='green'?'🟢':'🔴'} ${a.ha1D.en}</td></tr>
+      <tr><td>EMA(8)</td><td>${f(a.e8d)}<br><span style="font-size:10px;color:var(--dim2)">偏离 ${f(a.ed1D)}%</span></td>
+          <td class="${(a.ed1D||0)>0?'bull':'bear'}">${(a.ed1D||0)>0?'上方':'下方'} | ${esLabel(a.es1D)}${Math.abs(a.ed1D||0)>5?' ⚠拉伸':''}</td></tr>
+      <tr><td>OBV (1D)</td><td>${f(a.obv1D/1e6,3)}M</td>
+          <td class="${a.otr1D==='rising'?'bull':a.otr1D==='fall3'?'bear':a.otr1D==='falling'?'bear':'neu'}">${obvLabel(a.otr1D)}</td></tr>
+      <tr><td>成交量</td><td>${a.vvm1D?(a.vvm1D*100).toFixed(0)+'% MA20':'—'}</td>
+          <td class="${(a.vvm1D||0)>=1.2?'bull':(a.vvm1D||0)<0.8?'bear':'neu'}">${(a.vvm1D||0)>=1.2?'放量':(a.vvm1D||0)<0.8?'缩量':'均值附近'}</td></tr>
+      <tr><td>TD9 (1D)</td><td colspan="2" class="${td9dc}">${td9ds}</td></tr>
+      <tr><td>RSI(5)</td><td>${f(a.r5d,1)}</td>
+          <td class="${(a.r5d||0)>75?'bear':(a.r5d||0)<30?'bull':'neu'}">${(a.r5d||0)>75?'超买 ❌':(a.r5d||0)<30?'超卖':'正常'}</td></tr>
+      <tr><td>RSI(13)</td><td>${f(a.r13d,1)}</td>
+          <td class="${(a.r13d||0)>55?'bull':(a.r13d||0)<45?'bear':'neu'}">${rsiRegion(a.r13d||0)}${a.div1D.bear?' ⚠看跌背离':''}</td></tr>
+      <tr><td>RSI(34)</td><td>${f(a.r34d,1)}</td>
+          <td class="${(a.r34d||0)>50?'bull':'bear'}">${(a.r34d||0)>50?'中期偏多':'中期偏空 ⚠'}</td></tr>
+      <tr><td>RSI排列</td><td colspan="2" class="${a.rsiAl1D==='bull'?'bull':a.rsiAl1D==='bear'?'bear':'neu'}">${rsiAlignLabel(a.rsiAl1D)}</td></tr>
+    </table>
+  </div>
+
+  <!-- SCORE PANEL -->
+  <div class="panel">
+    <div class="ph">综合评分 <span style="font-size:9px;color:var(--dim2)">V6.1+Q</span></div>
+
+    <div style="padding:10px 0 10px;border-bottom:1px solid var(--border);margin-bottom:9px">
+      <div class="scnum" style="color:${scoreCol}">${score}<span class="scdenom">/10</span></div>
+      <div class="sclbl">V6.1 核心评分</div>
+      <div class="qscore">Q+${qs}<span style="font-size:11px;color:var(--dim2)">/6 量化加分</span></div>
+    </div>
+
+    ${veto.length>0?`
+    <div class="veto-box" style="margin-bottom:8px">
+      <div style="font-size:9px;letter-spacing:2px;color:var(--red);margin-bottom:3px">⛔ 一票否决项</div>
+      ${veto.map(v=>`<div class="vt">✗ ${v}</div>`).join('')}
+    </div>`:`
+    <div class="veto-clear" style="margin-bottom:8px">✓ 所有否决项均通过</div>`}
+
+    ${items.map(it=>`
+    <div class="sc-item">
+      <span class="sc-item-l">${it.lbl}</span>
+      <span class="${it.pass?'sc-pass':'sc-fail'}">${it.pass?'+'+it.pts:'0/'+it.pts}</span>
+    </div>`).join('')}
+
+    ${bonus.length>0?`
+    <div style="border-top:1px solid var(--border);padding-top:6px;margin-top:5px">
+      <div style="font-size:9px;letter-spacing:2px;color:var(--dim2);margin-bottom:3px">加分项 ${bonus.length}/7</div>
+      ${bonus.map(b=>`<div style="font-size:10px;color:var(--blue)">✓ ${b}</div>`).join('')}
+    </div>`:''}
+
+    <div style="border-top:1px solid var(--border);padding-top:9px;margin-top:8px;text-align:center">
+      <div class="rec-action rec-${recCls}">${rec}</div>
+      <div class="hbadge">📅 ${horizon} 持仓周期</div>
+    </div>
+  </div>
+
+  <!-- 1H PANEL -->
+  <div class="panel">
+    <div class="ph">小时线分析 <span class="tf-badge b1h">1H</span></div>
+    <div class="mc">${miniChart(a.ha1HArr)}</div>
+    <table class="itbl">
+      <tr><td>HA 蜡烛</td><td>${a.ha1H.cn}</td><td class="${fc(a.ha1H.col)}">${a.ha1H.col==='green'?'🟢':'🔴'} ${a.ha1H.en}</td></tr>
+      <tr><td>EMA(8)</td><td>${f(a.e8h)}<br><span style="font-size:10px;color:var(--dim2)">偏离 ${f(a.ed1H)}%</span></td>
+          <td class="${(a.ed1H||0)>0?'bull':'bear'}">${(a.ed1H||0)>0?'上方':'下方'} | ${esLabel(a.es1H)}${Math.abs(a.ed1H||0)>5?' ⚠拉伸':''}</td></tr>
+      <tr><td>OBV (1H)</td><td>${f(a.obv1H/1e6,3)}M</td>
+          <td class="${a.otr1H==='rising'?'bull':'bear'}">${obvLabel(a.otr1H)}${a.ovsh1H?' V形✓':''}</td></tr>
+      <tr><td>成交量</td><td>${a.vvm1H?(a.vvm1H*100).toFixed(0)+'% MA20':'—'}</td>
+          <td class="${(a.vvm1H||0)>=1.2?'bull':(a.vvm1H||0)<0.8?'bear':'neu'}">${(a.vvm1H||0)>=1.2?'放量':(a.vvm1H||0)<0.8?'缩量':'均值附近'}</td></tr>
+      <tr><td>TD9 (1H)</td><td colspan="2" class="${td9hc}">${td9hs}</td></tr>
+      <tr><td>RSI(5)</td><td>${f(a.r5h,1)}</td>
+          <td class="${(a.r5h||0)>75?'bear':(a.r5h||0)<30?'bull':'neu'}">${(a.r5h||0)>75?'超买 ❌':(a.r5h||0)<30?'超卖':'正常'}</td></tr>
+      <tr><td>RSI(13)</td><td>${f(a.r13h,1)}</td>
+          <td class="${(a.r13h||0)>55?'bull':(a.r13h||0)<45?'bear':'neu'}">${rsiRegion(a.r13h||0)}${a.div1H.bear?' ⚠看跌背离':''}${a.r13hRising?' ↑':''}</td></tr>
+      <tr><td>RSI(34)</td><td>${f(a.r34h,1)}</td>
+          <td class="${(a.r34h||0)>50?'bull':'bear'}">${(a.r34h||0)>50?'中期偏多':'中期偏空'}</td></tr>
+      <tr><td>RSI排列</td><td colspan="2" class="${a.rsiAl1H==='bull'?'bull':a.rsiAl1H==='bear'?'bear':'neu'}">${rsiAlignLabel(a.rsiAl1H)}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="stitle">量化增强层 / QUANT ENHANCEMENT</div>
+<div class="qgrid">
+  ${qi.map(q=>`
+  <div class="qm">
+    <div class="ql">${q.lbl}</div>
+    <div class="qv ${q.pts===q.max?'bull':q.pts>0?'warn':'neu'}">${q.val}</div>
+    <div class="qd">${q.detail} · +${q.pts}/${q.max}分</div>
+  </div>`).join('')}
+  <div class="qm">
+    <div class="ql">ADX 方向 (1D)</div>
+    <div class="qv ${a.adx1D.pdi>a.adx1D.mdi?'bull':'bear'}">${adxDir}</div>
+    <div class="qd">+DI ${f(a.adx1D.pdi,1)} | −DI ${f(a.adx1D.mdi,1)}</div>
+    <div class="adx-track"><div class="adx-fill" style="width:${Math.min((a.adx1D.adx||0)/50*100,100)}%;background:${(a.adx1D.adx||0)>=30?'var(--green)':(a.adx1D.adx||0)>=20?'var(--yellow)':'var(--red)'}"></div></div>
+  </div>
+  <div class="qm">
+    <div class="ql">BB 宽度 (1D)</div>
+    <div class="qv blu">${a.bb1D.width!==null?(a.bb1D.width*100).toFixed(2)+'%':'—'}</div>
+    <div class="qd">上 ${f(a.bb1D.upper)} | 中 ${f(a.bb1D.middle)} | 下 ${f(a.bb1D.lower)}</div>
+  </div>
+  <div class="qm">
+    <div class="ql">ATR(14) 日波动</div>
+    <div class="qv blu">${f(a.atr1D)}</div>
+    <div class="qd">${a.atr1D&&a.price?((a.atr1D/a.price)*100).toFixed(2)+'% 日均振幅':'—'}</div>
+  </div>
+</div>
+
+${plan?`
+<div class="stitle">交易计划 / TRADE PLAN</div>
+<div class="tgrid">
+  <div class="panel">
+    <div class="ph" style="font-size:11px">ATR 动态止损方案</div>
+    <table class="ptbl">
+      <tr><td>当前价格</td><td class="blu" style="font-weight:700">$${f(plan.p)}</td></tr>
+      <tr><td>ATR(14)</td><td>${f(plan.atr)} (${a.price?((plan.atr/a.price)*100).toFixed(2)+'%':''})</td></tr>
+      <tr><td>保守止损 (2×ATR)</td><td class="bear">$${f(plan.s1)}</td></tr>
+      <tr><td>标准止损 (1.5×ATR)</td><td class="warn">$${f(plan.s2)}</td></tr>
+      <tr><td>激进止损 (1×ATR)</td><td class="neu">$${f(plan.s3)}</td></tr>
+      <tr><td>R 值 (标准止损)</td><td class="blu">$${f(plan.R)}</td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <div class="ph" style="font-size:11px">分阶盈利目标</div>
+    <table class="ptbl">
+      <tr><td>第一目标 (+1.5R) → 减仓30%</td><td class="bull">$${f(plan.t1)}</td></tr>
+      <tr><td>第二目标 (+2.5R) → 减仓40%</td><td class="bull">$${f(plan.t2)}</td></tr>
+      <tr><td>第三目标</td><td style="color:var(--dim2)">1D HA翻红 / TD9 SELL-9</td></tr>
+      <tr><td>建议仓位</td><td class="${plan.pos>=100?'bull':plan.pos>=50?'warn':'neu'}">${plan.pos}% 计划仓位</td></tr>
+      <tr><td>最大持仓时间</td><td class="neu">${horizon}</td></tr>
+    </table>
+  </div>
+</div>`:''}
+
+${a.obvCDrop?`<div class="alert-red">⚠️ <strong>1D OBV 趋势性下降警告：</strong>连续3根以上K线 OBV 持续下滑，资金净流出趋势明显。入场门槛自动升至 9 分，仓位上限降为半仓，即使总分≥9分。</div>`:''}
+${a.div1D.bear?`<div class="alert-yellow">⚠️ <strong>RSI(13) 1D 看跌背离：</strong>价格创新高但 RSI(13) 未同步创高，上涨动能衰减。建议减仓30%并提高警惕。</div>`:''}
+${a.div1H.bear?`<div class="alert-yellow">⚠️ <strong>RSI(13) 1H 看跌背离：</strong>小时级别背离信号，短期上行动能减弱，注意出场节点。</div>`:''}
+${Math.abs(a.ed1D||0)>5?`<div class="alert-blue">⚠️ <strong>价格偏离 EMA(8) 超过 5%：</strong>当前偏离 ${f(a.ed1D)}%，追高风险较高，建议等待回调至 EMA 附近再介入。</div>`:''}
+
+<div class="ts">分析时间: ${new Date().toLocaleString('zh-CN')} · 数据: Twelve Data · 最新收盘日期: ${a.dt1D}</div>
+<div class="footer">
+  ⚠ 本系统仅供交易参考，不构成任何投资建议。所有指标均基于历史价格计算，不预测未来走势。<br>
+  止损为必要风险管理工具，任何入场必须设置止损。交易决策须结合个人风险承受能力和实际市场情况。
+</div>`;
+};
+
+/* ═══════════════════════════════════════════════
+   API FETCH — 4 PARALLEL CALLS + CACHE
+═══════════════════════════════════════════════ */
+
+const CACHE_MIN = 30;
+const cacheKey = sym => `sqv7_${sym}_${new Date().toISOString().slice(0,13)}`;
+
+const setCache = (k,v) => { try{sessionStorage.setItem(k,JSON.stringify({v,ts:Date.now()}));}catch(e){} };
+const getCache = k => {
+  try{const r=JSON.parse(sessionStorage.getItem(k));
+    if(!r||Date.now()-r.ts>CACHE_MIN*60000) return null;
+    return r.v;}catch{return null;}
+};
+
+const setDot = (id, state, txt) => {
+  const d=document.getElementById('d'+id);
+  const s=document.getElementById('s'+id);
+  if(d){d.className='dot'+(state==='ok'?' ok':state==='err'?' err':state==='work'?' working':'');}
+  if(s&&txt) s.textContent=txt;
+};
+
+const fetchAllData = async (sym, apiKey) => {
+  const ck=cacheKey(sym);
+  const cached=getCache(ck);
+  if(cached){
+    const cs=document.getElementById('cs');
+    cs.textContent='✓ 使用缓存 (30分钟内有效)'; cs.className='cs live';
+    return cached;
+  }
+
+  const B='https://api.twelvedata.com';
+  // ★ OPTIMIZATION: 4 parallel fetch calls via Promise.all
+  // SPY/QQQ only needs 5 bars (HA classification only)
+  // Symbol needs 60 bars (enough for all indicator periods)
+  const [r1d,r1h,rspy,rqqq] = await Promise.all([
+    fetch(`${B}/time_series?symbol=${sym}&interval=1day&outputsize=60&apikey=${apiKey}`)
+      .then(r=>{setDot('1d','ok','1D ✓');return r.json();}),
+    fetch(`${B}/time_series?symbol=${sym}&interval=1h&outputsize=60&apikey=${apiKey}`)
+      .then(r=>{setDot('1h','ok','1H ✓');return r.json();}),
+    fetch(`${B}/time_series?symbol=SPY&interval=1day&outputsize=5&apikey=${apiKey}`)
+      .then(r=>r.json()),
+    fetch(`${B}/time_series?symbol=QQQ&interval=1day&outputsize=5&apikey=${apiKey}`)
+      .then(r=>{setDot('sm','ok','SPY/QQQ ✓');return r.json();}),
+  ]);
+
+  const result={r1d,r1h,rspy,rqqq};
+  setCache(ck, result);
+  const cs=document.getElementById('cs');
+  cs.textContent='● 实时数据（缓存30分钟）'; cs.className='cs live';
+  return result;
+};
+
+/* ═══════════════════════════════════════════════
+   MAIN ENTRY
+═══════════════════════════════════════════════ */
+
+async function startAnalysis(){
+  const sym=(document.getElementById('sym').value||'').trim().toUpperCase();
+  const akey=(document.getElementById('akey').value||'').trim();
+  if(!sym||!akey){
+    document.getElementById('errbox').innerHTML='<div class="err-msg">请输入股票代码和 Twelve Data API Key。<br>免费 API Key 可在 twelvedata.com 注册获取。</div>';
+    return;
+  }
+
+  const btn=document.getElementById('abtn');
+  btn.disabled=true; btn.textContent='⏳ 分析中...';
+  document.getElementById('loading').style.display='block';
+  document.getElementById('report').style.display='none';
+  document.getElementById('errbox').innerHTML='';
+  ['1d','1h','sm','ca'].forEach(id=>setDot(id,'',''));
+
+  try{
+    setDot('1d','work','1D 拉取中...'); setDot('1h','work','1H 拉取中...');
+    const {r1d,r1h,rspy,rqqq}=await fetchAllData(sym,akey);
+
+    if(r1d.status==='error') throw new Error(`日线数据: ${r1d.message}`);
+    if(r1h.status==='error') throw new Error(`小时线数据: ${r1h.message}`);
+
+    setDot('ca','work','计算中...');
+
+    const b1D=parseOHLCV(r1d), b1H=parseOHLCV(r1h);
+    const bSpy=parseOHLCV(rspy), bQqq=parseOHLCV(rqqq);
+
+    if(!b1D||b1D.length<40) throw new Error('日线数据不足（需≥40根K线）');
+    if(!b1H||b1H.length<30) throw new Error('小时线数据不足（需≥30根K线）');
+
+    const a=analyze(b1D,b1H,bSpy,bQqq);
+    const v61=scoreV61(a);
+    const qsc=scoreQuant(a);
+    const plan=v61.score>=6&&v61.veto.length===0?tradePlan(a,v61.score):null;
+
+    setDot('ca','ok','计算完成 ✓');
+
+    document.getElementById('report').innerHTML=renderReport(a,v61,qsc,plan,sym);
+    document.getElementById('report').style.display='block';
+
+  }catch(err){
+    ['1d','1h','sm','ca'].forEach(id=>{const d=document.getElementById('d'+id);if(d&&!d.classList.contains('ok'))d.classList.add('err');});
+    document.getElementById('errbox').innerHTML=`<div class="err-msg">❌ ${err.message}<br><br>
+      排查建议：<br>
+      1) 检查 API Key 是否有效（twelvedata.com 控制台）<br>
+      2) 确认股票代码格式正确（如 AAPL、MSFT、TSLA）<br>
+      3) 免费账户限速 8次/分钟，如频繁请求请稍候再试<br>
+      4) ETF和指数需确认 Twelve Data 支持该代码</div>`;
+  }finally{
+    document.getElementById('loading').style.display='none';
+    btn.disabled=false; btn.textContent='▶ 分析';
+  }
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown',e=>{ if(e.key==='Enter')startAnalysis(); });
+document.getElementById('sym').addEventListener('input',function(){this.value=this.value.toUpperCase();});
+</script>
+</body>
+</html>
