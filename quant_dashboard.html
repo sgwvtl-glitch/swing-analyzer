@@ -240,8 +240,118 @@ function calcVol1h(hD){
   return{ratio,surge:ratio>1.8, priceUp:hc[0]>hc[1]};
 }
 
+
+/* ── Price Action calculations ───────────────────────────
+   Uses OHLC daily data. Detects:
+   1. Candlestick patterns (last 2 bars)
+   2. Breakout vs 20-day range
+   3. Pivot S/R levels
+   4. HH/LL trend structure (swing highs/lows)
+─────────────────────────────────────────────────────────── */
+function calcPriceAction(c,h,l,o){
+  if(!o||c.length<22||h.length<22||l.length<22||o.length<22) return null;
+
+  const price=c[0];
+  const bodySize   =i=> Math.abs(c[i]-o[i]);
+  const candleRange=i=> h[i]-l[i];
+  const isGreen    =i=> c[i]>o[i];
+  const upperWick  =i=> h[i]-Math.max(c[i],o[i]);
+  const lowerWick  =i=> Math.min(c[i],o[i])-l[i];
+
+  // ── Candlestick Patterns ─────────────────────────────
+  const patterns=[];
+
+  // Bullish Engulfing: today green body fully wraps yesterday red body
+  if(!isGreen(1)&&isGreen(0)&&o[0]<=c[1]&&c[0]>=o[1]&&bodySize(0)>bodySize(1)*1.1)
+    patterns.push({name:"Bullish Engulfing",bias:1,strength:"strong"});
+
+  // Bearish Engulfing: today red body fully wraps yesterday green body
+  if(isGreen(1)&&!isGreen(0)&&o[0]>=c[1]&&c[0]<=o[1]&&bodySize(0)>bodySize(1)*1.1)
+    patterns.push({name:"Bearish Engulfing",bias:-1,strength:"strong"});
+
+  // Hammer: small body at top, long lower wick (≥2× body), tiny upper wick
+  if(lowerWick(0)>=bodySize(0)*2&&upperWick(0)<=bodySize(0)*0.4&&candleRange(0)>0)
+    patterns.push({name:"Hammer",bias:1,strength:"moderate"});
+
+  // Shooting Star: small body at bottom, long upper wick (≥2× body)
+  if(upperWick(0)>=bodySize(0)*2&&lowerWick(0)<=bodySize(0)*0.4&&candleRange(0)>0)
+    patterns.push({name:"Shooting Star",bias:-1,strength:"moderate"});
+
+  // Doji: body < 10% of range — indecision
+  if(bodySize(0)<candleRange(0)*0.1&&candleRange(0)>0)
+    patterns.push({name:"Doji",bias:0,strength:"weak"});
+
+  // Bullish Harami: yesterday big red, today small green inside it
+  if(!isGreen(1)&&isGreen(0)&&o[0]>c[1]&&c[0]<o[1]&&bodySize(0)<bodySize(1)*0.5)
+    patterns.push({name:"Bullish Harami",bias:1,strength:"moderate"});
+
+  // Bearish Harami: yesterday big green, today small red inside it
+  if(isGreen(1)&&!isGreen(0)&&o[0]<c[1]&&c[0]>o[1]&&bodySize(0)<bodySize(1)*0.5)
+    patterns.push({name:"Bearish Harami",bias:-1,strength:"moderate"});
+
+  // Morning Star (3-bar): big red, small body gap, big green
+  if(c.length>=3&&!isGreen(2)&&bodySize(1)<bodySize(2)*0.4&&isGreen(0)&&c[0]>o[2])
+    patterns.push({name:"Morning Star",bias:1,strength:"strong"});
+
+  // Evening Star (3-bar): big green, small body, big red
+  if(c.length>=3&&isGreen(2)&&bodySize(1)<bodySize(2)*0.4&&!isGreen(0)&&c[0]<o[2])
+    patterns.push({name:"Evening Star",bias:-1,strength:"strong"});
+
+  // ── Breakout Detection ───────────────────────────────
+  const hi20=Math.max(...h.slice(1,21));  // exclude today
+  const lo20=Math.min(...l.slice(1,21));
+  const hi5 =Math.max(...h.slice(1,6));
+  const lo5 =Math.min(...l.slice(1,6));
+  const rangeWidth=(hi20-lo20)/lo20;
+
+  const breakout20dHigh = price>hi20;
+  const breakout20dLow  = price<lo20;
+  const breakout5dHigh  = price>hi5&&!breakout20dHigh;
+  const nearResistance  = (hi20-price)/price<0.015&&!breakout20dHigh; // within 1.5%
+  const nearSupport     = (price-lo20)/price<0.015&&!breakout20dLow;
+
+  // ── Pivot S/R (last 20 days, look for swing highs/lows) ──
+  const pivotHighs=[], pivotLows=[];
+  for(let i=2;i<Math.min(20,h.length-2);i++){
+    if(h[i]>h[i-1]&&h[i]>h[i+1]&&h[i]>h[i-2]&&h[i]>h[i+2])
+      pivotHighs.push(h[i]);
+    if(l[i]<l[i-1]&&l[i]<l[i+1]&&l[i]<l[i-2]&&l[i]<l[i+2])
+      pivotLows.push(l[i]);
+  }
+  // Nearest resistance above and support below current price
+  const resistances=pivotHighs.filter(p=>p>price).sort((a,b)=>a-b);
+  const supports   =pivotLows.filter(p=>p<price).sort((a,b)=>b-a);
+  const nearestRes =resistances[0]||null;
+  const nearestSup =supports[0]||null;
+  const distToRes  =nearestRes?(nearestRes-price)/price:null;
+  const distToSup  =nearestSup?(price-nearestSup)/price:null;
+
+  // ── HH/LL Trend Structure (swing highs/lows over 10 days) ──
+  const highs10=h.slice(0,10), lows10=l.slice(0,10);
+  const recentHigh=Math.max(...highs10.slice(0,5));
+  const prevHigh  =Math.max(...highs10.slice(5,10));
+  const recentLow =Math.min(...lows10.slice(0,5));
+  const prevLow   =Math.min(...lows10.slice(5,10));
+  const hhll = recentHigh>prevHigh&&recentLow>prevLow ? "HH+HL"   // uptrend structure
+             : recentHigh<prevHigh&&recentLow<prevLow ? "LH+LL"   // downtrend structure
+             : recentHigh>prevHigh&&recentLow<prevLow ? "HH+LL"   // expansion
+             : "LH+HL";                                            // contraction
+
+  // ── Consolidated PA bias ─────────────────────────────
+  const patternBias=patterns.reduce((s,p)=>s+p.bias*(p.strength==="strong"?2:1),0);
+
+  return{
+    patterns, patternBias,
+    breakout20dHigh, breakout20dLow, breakout5dHigh,
+    nearResistance, nearSupport,
+    hi20, lo20, hi5, lo5, rangeWidth,
+    nearestRes, nearestSup, distToRes, distToSup,
+    hhll
+  };
+}
+
 /* ── signal engine — 1-day to 2-week swing framework ────── */
-function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi1h,vol1h){
+function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi1h,vol1h,pa){
   if(!mom||!kelly||!cvar||!hmm||!trend)return null;
   let score=0;const notes=[];
   const{mom5d,mom10d,mom20d,accel}=mom;
@@ -308,6 +418,27 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi
   // 11. CVaR tail risk check
   if(!cvar.safe)      {score-=1;notes.push(`Tail risk elevated: CVaR(95%) = ${pct(cvar.cvar)} — reduce size`);}
 
+  // 12. Price Action — patterns, breakout, structure
+  if(pa){
+    // Candlestick pattern bias
+    if(pa.patternBias>=2)       {score+=2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bullish signal`);}
+    else if(pa.patternBias===1) {score+=1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bullish pattern`);}
+    else if(pa.patternBias<=-2) {score-=2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bearish signal`);}
+    else if(pa.patternBias===-1){score-=1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bearish pattern`);}
+    // Breakout
+    if(pa.breakout20dHigh)      {score+=2;notes.push(`PA: Breakout above 20-day high $${pa.hi20.toFixed(2)} — momentum breakout`);}
+    else if(pa.breakout5dHigh)  {score+=1;notes.push(`PA: Breaking above 5-day high $${pa.hi5.toFixed(2)}`);}
+    if(pa.breakout20dLow)       {score-=2;notes.push(`PA: Breakdown below 20-day low $${pa.lo20.toFixed(2)} — bearish breakdown`);}
+    // Near resistance — trim / caution
+    if(pa.nearResistance&&pa.distToRes!==null)
+      notes.push(`PA: Near 20-day resistance $${pa.nearestRes?.toFixed(2)} (+${pct(pa.distToRes,1)}) — consider partial exit`);
+    if(pa.nearSupport&&pa.distToSup!==null)
+      notes.push(`PA: Near 20-day support $${pa.nearestSup?.toFixed(2)} — good risk/reward entry zone`);
+    // HH/HL trend structure
+    if(pa.hhll==="HH+HL")       score+=1;
+    else if(pa.hhll==="LH+LL")  score-=1;
+  }
+
   // ── Action determination ─────────────────────────────────
   let action,direction;
   if(hmm.state==="BEAR"&&score<-3) {action="SELL";  direction="FLAT";}
@@ -349,8 +480,8 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi
   return{
     action,direction,risk,rColor,aColor,size,
     stop,target,rr,stopPct,targetPct,holdDays,
-    score,maxScore:17,notes,kelly,hmm,cvar,trend,rsi,vol,
-    mom5d,mom10d,mom20d,accel,amihud,mom1h,rsi1h,vol1h,
+    score,maxScore:22,notes,kelly,hmm,cvar,trend,rsi,vol,
+    mom5d,mom10d,mom20d,accel,amihud,mom1h,rsi1h,vol1h,pa,
     factors:[
       {label:"SPY Regime",         value:hmm.label,                color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
       {label:"5D Momentum",        value:pct(mom5d),               color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
@@ -364,6 +495,11 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,mom1h,rsi
       {label:"1h Volume",          value:vol1h?`${vol1h.ratio.toFixed(1)}×`:"—", color:vol1h?.surge&&vol1h?.priceUp?C.teal:vol1h?.surge&&!vol1h?.priceUp?C.red:C.amber},
       {label:"Liquidity",          value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
       {label:"CVaR (95%)",         value:pct(cvar.cvar),           color:cvar.safe?C.teal:C.red},
+      {label:"Candle Pattern",     value:pa?.patterns?.length>0?pa.patterns[0].name:"No pattern", color:pa?.patternBias>0?C.teal:pa?.patternBias<0?C.red:C.mid},
+      {label:"Breakout",           value:pa?.breakout20dHigh?"20D High ↑":pa?.breakout5dHigh?"5D High ↑":pa?.breakout20dLow?"20D Low ↓":"In Range", color:pa?.breakout20dHigh?C.teal:pa?.breakout20dLow?C.red:C.amber},
+      {label:"Trend Structure",    value:pa?.hhll||"—",            color:pa?.hhll==="HH+HL"?C.teal:pa?.hhll==="LH+LL"?C.red:C.amber},
+      {label:"Nearest Resistance", value:pa?.nearestRes?`$${pa.nearestRes.toFixed(2)}`:"—", color:pa?.nearResistance?C.red:C.mid},
+      {label:"Nearest Support",    value:pa?.nearestSup?`$${pa.nearestSup.toFixed(2)}`:"—", color:pa?.nearSupport?C.teal:C.mid},
     ]
   };
 }
@@ -516,11 +652,13 @@ function App(){
       const hc=h1D.map(d=>parseFloat(d.close));
       const price=c[0];
       const atr=calcATR(c,h,l,14);
+      const o=tD.map(d=>parseFloat(d.open||d.close));
       const sig=buildSignal(
         price,atr,
         calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
         calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c),
-        calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D)
+        calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D),
+        calcPriceAction(c,h,l,o)
       );
       setResult({ticker:ticker.toUpperCase(),price,
         chg:(c[0]-c[1])/c[1],
@@ -562,9 +700,11 @@ function App(){
           const hc=h1D.map(d=>parseFloat(d.close));
           const price=c[0];
           const atr=calcATR(c,h,l,14);
+          const o=tD.map(d=>parseFloat(d.open||d.close));
           const sig=buildSignal(price,atr,calcMomentum(c),calcAmihud(c,v),calcTrend(c),calcRSI(c),
             calcVolume(v,c),calcHMM(sc),calcKelly(c),calcCVaR(c),
-            calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D));
+            calcMomentum1h(hc),calcRSI1h(hc),calcVol1h(h1D),
+            calcPriceAction(c,h,l,o));
           setResult({ticker:tickerRef.current.toUpperCase(),price,chg:(c[0]-c[1])/c[1],
             closes:c.slice(0,60).reverse(),spyC:sc.slice(0,60).reverse(),
             hourly:hc.slice(0,48).reverse(),sig,ts:new Date().toLocaleString()});
@@ -800,6 +940,71 @@ function App(){
                 {S.factors.map((f,i)=><FactorRow key={i} label={f.label} value={f.value} color={f.color}/>)}
               </Card>
             </div>
+
+            {/* ── PRICE ACTION ── */}
+            {S.pa&&(
+              <Card style={{marginBottom:16,borderLeft:`2px solid ${C.blue}40`}}>
+                <Label>Price Action Analysis</Label>
+                <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr 1fr",gap:12,marginBottom:S.pa.patterns.length>0?14:0}}>
+                  {/* Breakout status */}
+                  <div style={{padding:"10px 12px",background:"var(--surface2)",borderRadius:3,
+                    border:`1px solid ${S.pa.breakout20dHigh?C.teal:S.pa.breakout20dLow?C.red:"var(--border)"}30`}}>
+                    <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:4}}>BREAKOUT STATUS</div>
+                    <div style={{fontSize:14,fontWeight:700,color:S.pa.breakout20dHigh?C.teal:S.pa.breakout20dLow?C.red:C.amber}}>
+                      {S.pa.breakout20dHigh?"Above 20D High ↑":S.pa.breakout5dHigh?"Above 5D High ↑":S.pa.breakout20dLow?"Below 20D Low ↓":"Inside Range"}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text-mid)",marginTop:3}}>
+                      Range: ${S.pa.lo20.toFixed(2)} – ${S.pa.hi20.toFixed(2)}
+                    </div>
+                  </div>
+                  {/* Trend structure */}
+                  <div style={{padding:"10px 12px",background:"var(--surface2)",borderRadius:3,
+                    border:`1px solid ${S.pa.hhll==="HH+HL"?C.teal:S.pa.hhll==="LH+LL"?C.red:"var(--border)"}30`}}>
+                    <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:4}}>SWING STRUCTURE</div>
+                    <div style={{fontSize:14,fontWeight:700,color:S.pa.hhll==="HH+HL"?C.teal:S.pa.hhll==="LH+LL"?C.red:C.amber}}>
+                      {S.pa.hhll}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text-mid)",marginTop:3}}>
+                      {S.pa.hhll==="HH+HL"?"Uptrend — Higher Highs & Higher Lows"
+                      :S.pa.hhll==="LH+LL"?"Downtrend — Lower Highs & Lower Lows"
+                      :S.pa.hhll==="HH+LL"?"Expanding range — volatile"
+                      :"Contracting range — breakout pending"}
+                    </div>
+                  </div>
+                  {/* S/R levels */}
+                  <div style={{padding:"10px 12px",background:"var(--surface2)",borderRadius:3,border:"1px solid var(--border)"}}>
+                    <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:4}}>KEY LEVELS</div>
+                    <div style={{fontSize:12,color:C.red,fontWeight:600}}>
+                      R: {S.pa.nearestRes?`$${S.pa.nearestRes.toFixed(2)} (+${pct(S.pa.distToRes||0,1)})`:"—"}
+                    </div>
+                    <div style={{fontSize:11,color:"var(--text-mid)",marginTop:2}}>Current: ${R.price.toFixed(2)}</div>
+                    <div style={{fontSize:12,color:C.teal,fontWeight:600,marginTop:2}}>
+                      S: {S.pa.nearestSup?`$${S.pa.nearestSup.toFixed(2)} (−${pct(S.pa.distToSup||0,1)})`:"—"}
+                    </div>
+                  </div>
+                </div>
+                {/* Candlestick patterns */}
+                {S.pa.patterns.length>0&&(
+                  <div style={{borderTop:"1px solid var(--border)",paddingTop:12}}>
+                    <div style={{fontSize:11,color:"var(--text-dim)",marginBottom:8}}>CANDLESTICK PATTERNS DETECTED</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {S.pa.patterns.map((p,i)=>(
+                        <div key={i} style={{padding:"5px 12px",borderRadius:3,fontSize:12,fontWeight:600,
+                          background:`${p.bias>0?C.teal:p.bias<0?C.red:C.mid}18`,
+                          border:`1px solid ${p.bias>0?C.teal:p.bias<0?C.red:C.mid}44`,
+                          color:p.bias>0?C.teal:p.bias<0?C.red:C.mid}}>
+                          {p.bias>0?"▲":p.bias<0?"▼":"◆"} {p.name}
+                          <span style={{fontSize:10,opacity:.7,marginLeft:6}}>{p.strength}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {S.pa.patterns.length===0&&(
+                  <div style={{fontSize:12,color:"var(--text-dim)",marginTop:4}}>No significant candlestick pattern on last bar</div>
+                )}
+              </Card>
+            )}
 
             {/* ── SCENARIO TABLE ── */}
             <Card style={{marginBottom:18}}>
