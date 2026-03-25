@@ -786,12 +786,12 @@ function App(){
   const startRefresh=useCallback((sym)=>{
     if(iRef.current)clearInterval(iRef.current);
     if(cRef.current)clearInterval(cRef.current);
-    let s=120;setCountdown(s);
-    cRef.current=setInterval(()=>{s-=1;if(s<=0)s=120;setCountdown(s);},1000);
+    let s=90;setCountdown(s);
+    cRef.current=setInterval(()=>{s-=1;if(s<=0)s=90;setCountdown(s);},1000);
     iRef.current=setInterval(()=>{
-      s=120;setCountdown(s);
+      s=90;setCountdown(s);
       (async()=>{try{const r=await computeAll(tRef.current.toUpperCase());setResult(r);}catch(_){}})();
-    },120000);
+    },90000);
   },[]);
 
   const analyze=useCallback(async()=>{
