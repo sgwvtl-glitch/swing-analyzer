@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>波段量化系统 V7.0</title>
+<title>波段量化分析系统</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -159,7 +159,7 @@ input[type=text]::placeholder{color:var(--tx4)}
 .adx-fill{height:100%;border-radius:3px;transition:width .6s}
 
 /* MINI CHART */
-.mc{width:100%;height:68px;margin-bottom:10px;border-radius:4px;background:var(--bg3);padding:4px;overflow:hidden}
+.mc{width:100%;height:180px;margin-bottom:10px;border-radius:4px;background:var(--bg3);padding:6px;overflow:hidden}
 
 /* BONUS */
 .bonus-row{font-size:11px;color:var(--blue);padding:2px 0}
@@ -176,7 +176,7 @@ input[type=text]::placeholder{color:var(--tx4)}
     <div class="hdr-title">📈 <span>波段量化</span>分析系统</div>
     <div class="hdr-sub">Swing Quant Analyzer · 1–10 Day Strategy · Powered by Twelve Data</div>
   </div>
-  <div class="hdr-ver">V7.0 · V6.1 + QUANT LAYER</div>
+  <div class="hdr-ver">波段量化分析系统</div>
 </div>
 
 <div class="inbar">
@@ -193,7 +193,10 @@ input[type=text]::placeholder{color:var(--tx4)}
   <div class="si"><div class="dot" id="d1h"></div><span id="s1h">1H 小时</span></div>
   <div class="si"><div class="dot" id="dsm"></div><span id="ssm">SPY / QQQ</span></div>
   <div class="si"><div class="dot" id="dca"></div><span id="sca">指标计算</span></div>
-  <div class="si" style="margin-left:auto;font-size:10px;color:var(--tx4)">4 并行调用 · 30 分钟缓存</div>
+  <div class="si" style="margin-left:auto;gap:10px;align-items:center">
+    <span style="font-size:10px;color:var(--tx4)">4 并行调用 · 30 分钟缓存</span>
+    <span id="refresh-badge" style="display:none;font-size:11px;font-weight:600;color:var(--yellow);background:rgba(240,188,46,.1);border:1px solid rgba(240,188,46,.3);padding:2px 10px;border-radius:4px">⟳ <span id="countdown">120</span>s 后刷新</span>
+  </div>
 </div>
 
 <div id="main">
@@ -520,7 +523,7 @@ const tradePlan = (a, s) => {
    MINI CHART
 ══════════════════════════════════════════ */
 const miniChart = haArr => {
-  const data=haArr.slice(-20), W=280, H=58, pd=3;
+  const data=haArr.slice(-20), W=280, H=165, pd=5;
   const prices=data.flatMap(c=>[c.h,c.l]);
   const lo=Math.min(...prices), hi=Math.max(...prices), rng=hi-lo||1;
   const bw=(W-pd*2)/data.length, y=p=>H-pd-((p-lo)/rng)*(H-pd*2);
@@ -576,7 +579,7 @@ const renderReport = (a, v61, qsc, plan, sym) => {
 <div class="sym-hdr">
   <div class="sym-name">${sym}</div>
   <div class="sym-price">$${f(a.price)}</div>
-  <div class="sym-lbl">V7.0 · V6.1 + QUANT LAYER</div>
+  
 </div>
 
 <div class="stitle">宏观背景 / MACRO FILTER</div>
@@ -622,11 +625,11 @@ const renderReport = (a, v61, qsc, plan, sym) => {
   </div>
 
   <div class="panel">
-    <div class="ph">综合评分 <span style="font-size:10px;color:var(--tx3);font-weight:500;letter-spacing:0">V6.1 + Q</span></div>
+    <div class="ph">综合评分</div>
     <div style="padding:10px 0 12px;border-bottom:1px solid var(--bdr);margin-bottom:11px;text-align:center">
       <div class="scnum" style="color:${scoreCol}">${score}<span class="scdenom">/10</span></div>
-      <div class="sclbl">V6.1 核心评分</div>
-      <div class="qscore">Q +${qs}<span style="font-size:11px;color:var(--tx3);font-weight:400"> / 6</span></div>
+      <div class="sclbl">核心评分</div>
+      <div class="qscore">Q +${qs}<span style="font-size:11px;color:var(--tx3);font-weight:400"> / 6 量化分</span></div>
     </div>
 
     ${veto.length>0?`
@@ -755,9 +758,9 @@ const setDot=(id,state,txt)=>{
   if(s&&txt) s.textContent=txt;
 };
 
-const fetchAllData=async sym=>{
+const fetchAllData=async (sym, forceRefresh=false)=>{
   const ck=cacheKey(sym), cached=getCache(ck);
-  if(cached){const cs=document.getElementById('cs');cs.textContent='✓ 使用缓存 (30 分钟内有效)';cs.className='cs live';return cached;}
+  if(cached && !forceRefresh){const cs=document.getElementById('cs');cs.textContent='✓ 使用缓存 (30 分钟内有效)';cs.className='cs live';return cached;}
   const B='https://api.twelvedata.com';
   const [r1d,r1h,rspy,rqqq]=await Promise.all([
     fetch(`${B}/time_series?symbol=${sym}&interval=1day&outputsize=60&apikey=${API_KEY}`).then(r=>{setDot('1d','ok','1D ✓');return r.json();}),
@@ -774,7 +777,7 @@ const fetchAllData=async sym=>{
 /* ══════════════════════════════════════════
    MAIN ENTRY
 ══════════════════════════════════════════ */
-async function startAnalysis(){
+async function startAnalysis(forceRefresh=false){
   const sym=(document.getElementById('sym').value||'').trim().toUpperCase();
   if(!sym){document.getElementById('errbox').innerHTML='<div class="err-msg">请输入股票代码，例如：AAPL、MSFT、TSLA</div>';return;}
   const btn=document.getElementById('abtn');
@@ -785,7 +788,7 @@ async function startAnalysis(){
   ['1d','1h','sm','ca'].forEach(id=>setDot(id,'',''));
   try{
     setDot('1d','work','1D 拉取中…'); setDot('1h','work','1H 拉取中…');
-    const {r1d,r1h,rspy,rqqq}=await fetchAllData(sym);
+    const {r1d,r1h,rspy,rqqq}=await fetchAllData(sym, forceRefresh);
     if(r1d.status==='error') throw new Error(`日线数据: ${r1d.message}`);
     if(r1h.status==='error') throw new Error(`小时线数据: ${r1h.message}`);
     setDot('ca','work','计算中…');
@@ -815,6 +818,59 @@ async function startAnalysis(){
 
 document.addEventListener('keydown',e=>{if(e.key==='Enter')startAnalysis();});
 document.getElementById('sym').addEventListener('input',function(){this.value=this.value.toUpperCase();});
+
+/* ══════════════════════════════════════════
+   AUTO-REFRESH EVERY 90 SECONDS
+══════════════════════════════════════════ */
+const REFRESH_SEC = 120;
+let refreshTimer = null;
+let countdownTimer = null;
+let secondsLeft = REFRESH_SEC;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  secondsLeft = REFRESH_SEC;
+  const badge = document.getElementById('refresh-badge');
+  const cd = document.getElementById('countdown');
+  if (badge) badge.style.display = 'inline-flex';
+
+  countdownTimer = setInterval(() => {
+    secondsLeft--;
+    if (cd) cd.textContent = secondsLeft;
+    if (secondsLeft <= 0) {
+      secondsLeft = REFRESH_SEC;
+      const sym = (document.getElementById('sym').value || '').trim().toUpperCase();
+      if (sym) {
+        // clear cache entry so fresh data is fetched
+        try { sessionStorage.removeItem(cacheKey(sym)); } catch(e) {}
+        startAnalysis(true);
+      }
+    }
+  }, 1000);
+}
+
+function stopAutoRefresh() {
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  if (refreshTimer)   { clearInterval(refreshTimer);   refreshTimer = null;   }
+  secondsLeft = REFRESH_SEC;
+  const badge = document.getElementById('refresh-badge');
+  const cd = document.getElementById('countdown');
+  if (badge) badge.style.display = 'none';
+  if (cd) cd.textContent = REFRESH_SEC;
+}
+
+// patch startAnalysis to (re)start the countdown after each successful run
+const _origStartAnalysis = startAnalysis;
+startAnalysis = async function(forceRefresh=false) {
+  await _origStartAnalysis(forceRefresh);
+  const sym = (document.getElementById('sym').value || '').trim().toUpperCase();
+  if (sym) {
+    secondsLeft = REFRESH_SEC;
+    const cd = document.getElementById('countdown');
+    if (cd) cd.textContent = REFRESH_SEC;
+    if (!countdownTimer) startAutoRefresh();
+  }
+};
 </script>
 </body>
 </html>
