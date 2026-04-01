@@ -445,121 +445,124 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,
   if(!mom||!kelly||!cvar||!hmm||!trend)return null;
   let score=0;const notes=[];
   const{mom5d,mom10d,accel}=mom;
+  let sRegime=0,sMom5=0,sAccel=0,sMA=0,sRSI7=0,sVol=0;
+  let s1hMom=0,s1hRSI=0,s1hVol=0,sLiq=0,sCVaR=0;
+  let sPAPat=0,sPABrk=0,sPAStr=0,sFib=0,sStoch=0,sVO=0,sHA=0,sRSICurl=0;
 
   /* #1 SPY Regime ─────────────────────── */
-  if(hmm.state==="BULL")              score+=3;
-  else if(hmm.state==="TRANSITION") {score+=1;notes.push("Market in transition — reduce size, higher conviction bar for entries");}
-  else                              {score-=4;notes.push("Bear regime — only high-conviction setups, reduce existing exposure");}
+  if(hmm.state==="BULL")              {score+=3;sRegime=3;}
+  else if(hmm.state==="TRANSITION") {score+=1;sRegime=1;notes.push("Market in transition — reduce size, higher conviction bar for entries");}
+  else                              {score-=4;sRegime=-4;notes.push("Bear regime — only high-conviction setups, reduce existing exposure");}
 
   /* #2 5-day momentum ─────────────────── */
-  if(mom5d>.04)        {score+=2;notes.push(`Strong 5D momentum +${pct(mom5d)} — trend continuation`);}
-  else if(mom5d>.015)   score+=1;
-  else if(mom5d<-.04)  {score-=2;notes.push(`Negative 5D momentum ${pct(mom5d)} — avoid long entry`);}
-  else if(mom5d<-.015)  score-=1;
+  if(mom5d>.04)        {score+=2;sMom5=2;notes.push(`Strong 5D momentum +${pct(mom5d)} — trend continuation`);}
+  else if(mom5d>.015)  {score+=1;sMom5=1;}
+  else if(mom5d<-.04)  {score-=2;sMom5=-2;notes.push(`Negative 5D momentum ${pct(mom5d)} — avoid long entry`);}
+  else if(mom5d<-.015) {score-=1;sMom5=-1;}
 
   /* #3 Momentum acceleration ──────────── */
-  if(accel>.02)  {score+=1;notes.push("Momentum accelerating — short-term thrust confirmed");}
-  else if(accel<-.02){score-=1;notes.push("Momentum decelerating — near-term fade risk");}
+  if(accel>.02)   {score+=1;sAccel=1;notes.push("Momentum accelerating — short-term thrust confirmed");}
+  else if(accel<-.02){score-=1;sAccel=-1;notes.push("Momentum decelerating — near-term fade risk");}
 
   /* #4 MA stack ───────────────────────── */
-  if(trend.trendAligned&&trend.ma10slope>0)    score+=2;
-  else if(trend.aboveMa10&&trend.aboveMa20)    score+=1;
-  else if(!trend.aboveMa10&&!trend.aboveMa20) {score-=2;notes.push("Price below MA10 & MA20 — short-term downtrend confirmed");}
-  else                                         score-=1;
+  if(trend.trendAligned&&trend.ma10slope>0)    {score+=2;sMA=2;}
+  else if(trend.aboveMa10&&trend.aboveMa20)    {score+=1;sMA=1;}
+  else if(!trend.aboveMa10&&!trend.aboveMa20) {score-=2;sMA=-2;notes.push("Price below MA10 & MA20 — short-term downtrend confirmed");}
+  else                                         {score-=1;sMA=-1;}
 
   /* #5 RSI(7) ──────────────────────────── */
   if(rsi!==null){
-    if(rsi<25)      {score+=2;notes.push(`RSI(7) deeply oversold at ${rsi.toFixed(0)} — high rebound probability`);}
-    else if(rsi<40) {score+=1;notes.push(`RSI(7) oversold at ${rsi.toFixed(0)} — pullback entry opportunity`);}
-    else if(rsi>80) {score-=2;notes.push(`RSI(7) overbought at ${rsi.toFixed(0)} — wait for consolidation or pullback`);}
-    else if(rsi>65)  score-=1;
-    else if(rsi>45)  score+=1;
+    if(rsi<25)      {score+=2;sRSI7=2;notes.push(`RSI(7) deeply oversold at ${rsi.toFixed(0)} — high rebound probability`);}
+    else if(rsi<40) {score+=1;sRSI7=1;notes.push(`RSI(7) oversold at ${rsi.toFixed(0)} — pullback entry opportunity`);}
+    else if(rsi>80) {score-=2;sRSI7=-2;notes.push(`RSI(7) overbought at ${rsi.toFixed(0)} — wait for consolidation or pullback`);}
+    else if(rsi>65) {score-=1;sRSI7=-1;}
+    else if(rsi>45) {score+=1;sRSI7=1;}
   }
 
   /* #6 Volume daily ───────────────────── */
   if(vol){
-    if(vol.surge&&mom5d>0)  {score+=1;notes.push(`Volume surge ${vol.ratio.toFixed(1)}× avg — institutional buying confirmed`);}
-    if(vol.surge&&mom5d<0)  {score-=1;notes.push(`Volume surge on down-move — distribution signal, reduce exposure`);}
+    if(vol.surge&&mom5d>0)  {score+=1;sVol=1;notes.push(`Volume surge ${vol.ratio.toFixed(1)}× avg — institutional buying confirmed`);}
+    if(vol.surge&&mom5d<0)  {score-=1;sVol=-1;notes.push(`Volume surge on down-move — distribution signal, reduce exposure`);}
   }
 
   /* #7 1h momentum ────────────────────── */
   if(mom1h){
-    if(mom1h.trendUp&&mom1h.mom4h>.01)  {score+=1;notes.push(`1h trend aligned: +${pct(mom1h.mom4h,1)} past 4h`);}
-    if(mom1h.trendDn&&mom1h.mom4h<-.01) {score-=1;notes.push(`1h trend bearish: ${pct(mom1h.mom4h,1)} past 4h — await reversal`);}
+    if(mom1h.trendUp&&mom1h.mom4h>.01)  {score+=1;s1hMom=1;notes.push(`1h trend aligned: +${pct(mom1h.mom4h,1)} past 4h`);}
+    if(mom1h.trendDn&&mom1h.mom4h<-.01) {score-=1;s1hMom=-1;notes.push(`1h trend bearish: ${pct(mom1h.mom4h,1)} past 4h — await reversal`);}
   }
 
   /* #8 1h RSI ──────────────────────────── */
   if(rsi1h!==null){
-    if(rsi1h<25) {score+=1;notes.push(`1h RSI oversold at ${rsi1h.toFixed(0)} — intraday entry timing favourable`);}
-    if(rsi1h>80) {score-=1;notes.push(`1h RSI overbought at ${rsi1h.toFixed(0)} — wait for hourly pullback`);}
+    if(rsi1h<25) {score+=1;s1hRSI=1;notes.push(`1h RSI oversold at ${rsi1h.toFixed(0)} — intraday entry timing favourable`);}
+    if(rsi1h>80) {score-=1;s1hRSI=-1;notes.push(`1h RSI overbought at ${rsi1h.toFixed(0)} — wait for hourly pullback`);}
   }
 
   /* #9 1h volume ──────────────────────── */
   if(vol1h){
-    if(vol1h.surge&&vol1h.priceUp)  {score+=1;notes.push(`1h volume surge ${vol1h.ratio.toFixed(1)}× avg on uptick — intraday buying pressure`);}
-    if(vol1h.surge&&!vol1h.priceUp) {score-=1;notes.push(`1h volume surge on downtick — intraday distribution signal`);}
+    if(vol1h.surge&&vol1h.priceUp)  {score+=1;s1hVol=1;notes.push(`1h volume surge ${vol1h.ratio.toFixed(1)}× avg on uptick — intraday buying pressure`);}
+    if(vol1h.surge&&!vol1h.priceUp) {score-=1;s1hVol=-1;notes.push(`1h volume surge on downtick — intraday distribution signal`);}
   }
 
   /* #10 Liquidity ─────────────────────── */
-  if(amihud>5)        {score-=2;notes.push("Low liquidity — high slippage risk, widen stops or skip trade");}
-  else if(amihud<.5)   score+=1;
+  if(amihud>5)        {score-=2;sLiq=-2;notes.push("Low liquidity — high slippage risk, widen stops or skip trade");}
+  else if(amihud<.5)  {score+=1;sLiq=1;}
 
   /* #11 CVaR ──────────────────────────── */
-  if(!cvar.safe)      {score-=1;notes.push(`Tail risk elevated: CVaR(95%) = ${pct(cvar.cvar)} — reduce position size`);}
+  if(!cvar.safe)      {score-=1;sCVaR=-1;notes.push(`Tail risk elevated: CVaR(95%) = ${pct(cvar.cvar)} — reduce position size`);}
 
   /* #12 Price action ──────────────────── */
   if(pa){
-    if(pa.patternBias>=2)       {score+=2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bullish pattern`);}
-    else if(pa.patternBias===1) {score+=1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bullish pattern`);}
-    else if(pa.patternBias<=-2) {score-=2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bearish pattern`);}
-    else if(pa.patternBias===-1){score-=1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bearish pattern`);}
-    if(pa.breakout20dHigh)      {score+=2;notes.push(`Breakout above 20D high $${pa.hi20.toFixed(2)} — momentum breakout`);}
-    else if(pa.breakout5dHigh)  {score+=1;notes.push(`Breaking above 5D high $${pa.hi5.toFixed(2)}`);}
-    if(pa.breakout20dLow)       {score-=2;notes.push(`Breakdown below 20D low $${pa.lo20.toFixed(2)} — bearish breakdown`);}
+    if(pa.patternBias>=2)       {score+=2;sPAPat=2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bullish pattern`);}
+    else if(pa.patternBias===1) {score+=1;sPAPat=1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bullish pattern`);}
+    else if(pa.patternBias<=-2) {score-=2;sPAPat=-2;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — strong bearish pattern`);}
+    else if(pa.patternBias===-1){score-=1;sPAPat=-1;notes.push(`PA: ${pa.patterns.map(p=>p.name).join(" + ")} — bearish pattern`);}
+    if(pa.breakout20dHigh)      {score+=2;sPABrk=2;notes.push(`Breakout above 20D high $${pa.hi20.toFixed(2)} — momentum breakout`);}
+    else if(pa.breakout5dHigh)  {score+=1;sPABrk=1;notes.push(`Breaking above 5D high $${pa.hi5.toFixed(2)}`);}
+    if(pa.breakout20dLow)       {score-=2;sPABrk=-2;notes.push(`Breakdown below 20D low $${pa.lo20.toFixed(2)} — bearish breakdown`);}
     if(pa.nearResistance&&pa.distToRes!==null)
       notes.push(`Near 20D resistance $${pa.nearestRes?.toFixed(2)} (+${pct(pa.distToRes,1)}) — consider partial exit`);
-    if(pa.hhll==="HH+HL")  score+=1;
-    else if(pa.hhll==="LH+LL") score-=1;
+    if(pa.hhll==="HH+HL")       {score+=1;sPAStr=1;}
+    else if(pa.hhll==="LH+LL")  {score-=1;sPAStr=-1;}
   }
 
-  /* #13 Fibonacci zone ── KEY ADDITION ── */
+  /* #13 Fibonacci zone ────────────────── */
   if(fib){
-    if(fib.goldenZone)        {score+=2;notes.push(`Fibonacci: Price in golden zone (61.8%) — optimal swing entry area`);}
-    else if(fib.bullishZone)  {score+=1;notes.push(`Fibonacci: Price at 50% support — structural entry zone`);}
-    else if(fib.at382)        {score+=1;notes.push(`Fibonacci: Price at 38.2% — shallow retracement, moderate support`);}
-    else if(fib.retracePct<0.20&&mom5d>0) {score-=1;notes.push("Fibonacci: Minimal retracement — price may be overextended, wait for pullback");}
-    else if(fib.retracePct>0.786)         {score-=1;notes.push("Fibonacci: Deep retrace >78.6% — trend reversal risk, tighten stops");}
+    if(fib.goldenZone)                           {score+=2;sFib=2;notes.push(`Fibonacci: Price in golden zone (61.8%) — optimal swing entry area`);}
+    else if(fib.bullishZone)                     {score+=1;sFib=1;notes.push(`Fibonacci: Price at 50% support — structural entry zone`);}
+    else if(fib.at382)                           {score+=1;sFib=1;notes.push(`Fibonacci: Price at 38.2% — shallow retracement, moderate support`);}
+    else if(fib.retracePct<0.20&&mom5d>0)        {score-=1;sFib=-1;notes.push("Fibonacci: Minimal retracement — price may be overextended, wait for pullback");}
+    else if(fib.retracePct>0.786)                {score-=1;sFib=-1;notes.push("Fibonacci: Deep retrace >78.6% — trend reversal risk, tighten stops");}
   }
 
   /* #14 Stochastic RSI ─────────────────── */
   if(stochRSI){
-    if(stochRSI.bullCross)   {score+=2;notes.push(`Stoch RSI: Bullish cross (%K>${stochRSI.k.toFixed(0)} over %D) from oversold — strong entry signal`);}
-    else if(stochRSI.oversold&&stochRSI.risingK){score+=1;notes.push(`Stoch RSI: %K rising from oversold (${stochRSI.k.toFixed(0)}) — potential bottom`);}
-    else if(stochRSI.oversold)  score+=1;
-    if(stochRSI.bearCross)   {score-=2;notes.push(`Stoch RSI: Bearish cross from overbought — exit signal`);}
-    else if(stochRSI.overbought){score-=1;notes.push(`Stoch RSI: Overbought at ${stochRSI.k.toFixed(0)} — pause or take partial profit`);}
+    if(stochRSI.bullCross)              {score+=2;sStoch=2;notes.push(`Stoch RSI: Bullish cross (%K>${stochRSI.k.toFixed(0)} over %D) from oversold — strong entry signal`);}
+    else if(stochRSI.oversold&&stochRSI.risingK){score+=1;sStoch=1;notes.push(`Stoch RSI: %K rising from oversold (${stochRSI.k.toFixed(0)}) — potential bottom`);}
+    else if(stochRSI.oversold)          {score+=1;sStoch=1;}
+    if(stochRSI.bearCross)              {score-=2;sStoch=-2;notes.push(`Stoch RSI: Bearish cross from overbought — exit signal`);}
+    else if(stochRSI.overbought)        {score-=1;sStoch=-1;notes.push(`Stoch RSI: Overbought at ${stochRSI.k.toFixed(0)} — pause or take partial profit`);}
   }
 
   /* #15 Volume Oscillator ─────────────── */
   if(vo){
-    if(vo.bullDiv)             {score+=2;notes.push("VO Divergence: Price new low but VO rising — bullish volume divergence, strong buy signal");}
-    else if(vo.positive&&vo.rising){score+=1;notes.push(`VO: Volume expanding (${vo.vo.toFixed(1)}%) — institutional participation confirmed`);}
-    if(vo.bearDiv)             {score-=1;notes.push("VO Divergence: Price new high but VO falling — bearish volume divergence, caution");}
-    else if(!vo.positive&&!vo.rising){score-=1;notes.push(`VO: Volume contracting (${vo.vo.toFixed(1)}%) — weak participation, trend may lack conviction`);}
+    if(vo.bullDiv)                       {score+=2;sVO=2;notes.push("VO Divergence: Price new low but VO rising — bullish volume divergence, strong buy signal");}
+    else if(vo.positive&&vo.rising)      {score+=1;sVO=1;notes.push(`VO: Volume expanding (${vo.vo.toFixed(1)}%) — institutional participation confirmed`);}
+    if(vo.bearDiv)                       {score-=1;sVO=-1;notes.push("VO Divergence: Price new high but VO falling — bearish volume divergence, caution");}
+    else if(!vo.positive&&!vo.rising)    {score-=1;sVO=-1;notes.push(`VO: Volume contracting (${vo.vo.toFixed(1)}%) — weak participation, trend may lack conviction`);}
   }
 
   /* #16 HA quality ────────────────────── */
   if(haQuality){
-    if(haQuality.strongBull)  {score+=2;notes.push("HA: 3 consecutive green bars, no lower wicks — maximum entry signal quality");}
-    else if(haQuality.reversalUp){score+=1;notes.push("HA: Reversal bar — green body engulfs prior red, momentum switching");}
-    else if(haQuality.allBull)   score+=1;
-    if(haQuality.strongBear)  {score-=2;notes.push("HA: 3 consecutive red bars, no upper wicks — strong downtrend, avoid long");}
-    else if(haQuality.allBear)   score-=1;
+    if(haQuality.strongBull)             {score+=2;sHA=2;notes.push("HA: 3 consecutive green bars, no lower wicks — maximum entry signal quality");}
+    else if(haQuality.reversalUp)        {score+=1;sHA=1;notes.push("HA: Reversal bar — green body engulfs prior red, momentum switching");}
+    else if(haQuality.allBull)           {score+=1;sHA=1;}
+    if(haQuality.strongBear)             {score-=2;sHA=-2;notes.push("HA: 3 consecutive red bars, no upper wicks — strong downtrend, avoid long");}
+    else if(haQuality.allBear)           {score-=1;sHA=-1;}
   }
 
   /* #17 RSI curl ──────────────────────── */
   if(rsiCurl&&fib?.bullishZone){
-    if(rsiCurl.curlUp&&rsiCurl.r0<50){score+=1;notes.push(`RSI curling up at ${rsiCurl.r0.toFixed(0)} near Fib support — classic RSI double-bottom setup`);}
+    if(rsiCurl.curlUp&&rsiCurl.r0<50)   {score+=1;sRSICurl=1;notes.push(`RSI curling up at ${rsiCurl.r0.toFixed(0)} near Fib support — classic RSI double-bottom setup`);}
   }
 
   /* ── Action determination ────────────── */
@@ -644,32 +647,35 @@ function buildSignal(price,atr,mom,amihud,trend,rsi,vol,hmm,kelly,cvar,
   return{
     action,direction,risk,rColor,aColor,size,
     stop,target,rr,stopPct,targetPct,holdDays:"1–10 days",
-    score,maxScore:28,notes,kelly,hmm,cvar,trend,rsi,vol,
+    score,maxScore:27,notes,kelly,hmm,cvar,trend,rsi,vol,
     mom5d,mom10d,mom20d:mom.mom20d,accel,amihud,
     mom1h,rsi1h,vol1h,pa,fib,stochRSI,vo,haQuality,rsiCurl,
     entryConds,passCount,entryGrade,
     factors:[
-      {label:"SPY Regime",          value:hmm.label,                  color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
-      {label:"5D Momentum",         value:pct(mom5d),                 color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
-      {label:"10D Momentum",        value:pct(mom10d),                color:mom10d>.02?C.teal:mom10d>0?C.amber:C.red},
-      {label:"MA Stack (daily)",    value:trend.trendAligned?"Aligned":"Broken", color:trend.trendAligned?C.teal:C.red},
-      {label:"RSI-7 (daily)",       value:rsi?rsi.toFixed(1):"—",    color:rsi<40?C.teal:rsi>65?C.red:C.amber},
-      {label:"RSI Curl",            value:rsiCurl?rsiCurl.curlUp?"↑ Curling Up":rsiCurl.curlDn?"↓ Curling Dn":"→ Flat":"—", color:rsiCurl?.curlUp?C.teal:rsiCurl?.curlDn?C.red:C.mid},
-      {label:"Volume (daily)",      value:vol?`${vol.ratio.toFixed(2)}×`:"—",   color:vol?.surge&&mom5d>0?C.teal:vol?.surge&&mom5d<0?C.red:C.amber},
-      {label:"Stoch RSI %K/%D",     value:stochRSI?`${stochRSI.k.toFixed(1)} / ${stochRSI.d.toFixed(1)}`:"—", color:stochRSI?.bullCross?C.teal:stochRSI?.bearCross?C.red:stochRSI?.oversold?C.teal:C.amber},
-      {label:"Stoch RSI Signal",    value:stochRSI?.crossLabel||"—", color:stochRSI?.bullCross?C.teal:stochRSI?.bearCross?C.red:C.mid},
-      {label:"Volume Oscillator",   value:vo?`${vo.vo.toFixed(1)}%`:"—",        color:vo?.bullDiv?C.teal:vo?.positive?C.teal:C.red},
-      {label:"VO Signal",           value:vo?vo.bullDiv?"Bull Divergence ★":vo.positive?"Expanding":"Contracting":"—", color:vo?.bullDiv?C.teal:vo?.positive?C.teal:C.red},
-      {label:"Fib Zone",            value:fib?fib.zone.split("(")[0].trim():"—", color:fib?.zoneColor||C.mid},
-      {label:"Fib Retrace Depth",   value:fib?pct(fib.retracePct,1):"—",        color:fib?.goldenZone?C.teal:fib?.bullishZone?C.teal:C.mid},
-      {label:"1h Momentum (4h)",    value:mom1h?pct(mom1h.mom4h):"—",           color:mom1h?.mom4h>.01?C.teal:mom1h?.mom4h<-.01?C.red:C.amber},
-      {label:"1h MA Trend",         value:mom1h?mom1h.trendUp?"↑ Bullish":mom1h.trendDn?"↓ Bearish":"→ Neutral":"—", color:mom1h?.trendUp?C.teal:mom1h?.trendDn?C.red:C.amber},
-      {label:"1h RSI-7",            value:rsi1h!==null?rsi1h.toFixed(1):"—",   color:rsi1h<25?C.teal:rsi1h>80?C.red:C.amber},
-      {label:"HA Quality (3-bar)",  value:haQuality?.strongBull?"Strong Bull ★":haQuality?.strongBear?"Strong Bear":haQuality?.reversalUp?"Reversal ↑":haQuality?.allBull?"Green":"Mixed", color:haQuality?.strongBull?C.teal:haQuality?.strongBear?C.red:haQuality?.allBull?C.teal:C.mid},
-      {label:"Candle Pattern",      value:pa?.patterns?.length>0?pa.patterns[0].name:"No pattern", color:pa?.patternBias>0?C.teal:pa?.patternBias<0?C.red:C.mid},
-      {label:"Trend Structure",     value:pa?.hhll||"—",                          color:pa?.hhll==="HH+HL"?C.teal:pa?.hhll==="LH+LL"?C.red:C.amber},
-      {label:"Nearest Resistance",  value:pa?.nearestRes?`$${pa.nearestRes.toFixed(2)}`:"—", color:pa?.nearResistance?C.red:C.mid},
-      {label:"Nearest Support",     value:pa?.nearestSup?`$${pa.nearestSup.toFixed(2)}`:"—", color:pa?.nearSupport?C.teal:C.mid},
+      {label:"SPY Regime",          pts:sRegime,  max:3,  value:hmm.label,                  color:hmm.state==="BULL"?C.teal:hmm.state==="BEAR"?C.red:C.amber},
+      {label:"5D Momentum",         pts:sMom5,    max:2,  value:pct(mom5d),                 color:mom5d>.015?C.teal:mom5d>0?C.amber:C.red},
+      {label:"10D Momentum",        pts:0,        max:0,  value:pct(mom10d),                color:mom10d>.02?C.teal:mom10d>0?C.amber:C.red},
+      {label:"Momentum Accel",      pts:sAccel,   max:1,  value:accel>.02?"Accelerating":accel<-.02?"Decelerating":"Flat", color:accel>.02?C.teal:accel<-.02?C.red:C.mid},
+      {label:"MA Stack (daily)",    pts:sMA,      max:2,  value:trend.trendAligned?"Aligned":"Broken", color:trend.trendAligned?C.teal:C.red},
+      {label:"RSI-7 (daily)",       pts:sRSI7,   max:2,  value:rsi?rsi.toFixed(1):"—",    color:rsi<40?C.teal:rsi>65?C.red:C.amber},
+      {label:"RSI Curl",            pts:sRSICurl, max:1,  value:rsiCurl?rsiCurl.curlUp?"↑ Curling Up":rsiCurl.curlDn?"↓ Curling Dn":"→ Flat":"—", color:rsiCurl?.curlUp?C.teal:rsiCurl?.curlDn?C.red:C.mid},
+      {label:"Volume (daily)",      pts:sVol,     max:1,  value:vol?`${vol.ratio.toFixed(2)}×`:"—",   color:vol?.surge&&mom5d>0?C.teal:vol?.surge&&mom5d<0?C.red:C.amber},
+      {label:"Stoch RSI %K/%D",     pts:sStoch,   max:2,  value:stochRSI?`${stochRSI.k.toFixed(1)} / ${stochRSI.d.toFixed(1)}`:"—", color:stochRSI?.bullCross?C.teal:stochRSI?.bearCross?C.red:stochRSI?.oversold?C.teal:C.amber},
+      {label:"Stoch RSI Signal",    pts:0,        max:0,  value:stochRSI?.crossLabel||"—", color:stochRSI?.bullCross?C.teal:stochRSI?.bearCross?C.red:C.mid},
+      {label:"Volume Oscillator",   pts:sVO,      max:2,  value:vo?`${vo.vo.toFixed(1)}%`:"—",        color:vo?.bullDiv?C.teal:vo?.positive?C.teal:C.red},
+      {label:"VO Signal",           pts:0,        max:0,  value:vo?vo.bullDiv?"Bull Divergence ★":vo.positive?"Expanding":"Contracting":"—", color:vo?.bullDiv?C.teal:vo?.positive?C.teal:C.red},
+      {label:"Fib Zone",            pts:sFib,     max:2,  value:fib?fib.zone.split("(")[0].trim():"—", color:fib?.zoneColor||C.mid},
+      {label:"Fib Retrace Depth",   pts:0,        max:0,  value:fib?pct(fib.retracePct,1):"—",        color:fib?.goldenZone?C.teal:fib?.bullishZone?C.teal:C.mid},
+      {label:"1h Momentum (4h)",    pts:s1hMom,   max:1,  value:mom1h?pct(mom1h.mom4h):"—",           color:mom1h?.mom4h>.01?C.teal:mom1h?.mom4h<-.01?C.red:C.amber},
+      {label:"1h MA Trend",         pts:0,        max:0,  value:mom1h?mom1h.trendUp?"↑ Bullish":mom1h.trendDn?"↓ Bearish":"→ Neutral":"—", color:mom1h?.trendUp?C.teal:mom1h?.trendDn?C.red:C.amber},
+      {label:"1h RSI-7",            pts:s1hRSI,   max:1,  value:rsi1h!==null?rsi1h.toFixed(1):"—",   color:rsi1h<25?C.teal:rsi1h>80?C.red:C.amber},
+      {label:"1h Volume Surge",     pts:s1hVol,   max:1,  value:vol1h?`${vol1h.ratio.toFixed(2)}×`:"—", color:vol1h?.surge&&vol1h?.priceUp?C.teal:vol1h?.surge?C.red:C.mid},
+      {label:"HA Quality (3-bar)",  pts:sHA,      max:2,  value:haQuality?.strongBull?"Strong Bull ★":haQuality?.strongBear?"Strong Bear":haQuality?.reversalUp?"Reversal ↑":haQuality?.allBull?"Green":"Mixed", color:haQuality?.strongBull?C.teal:haQuality?.strongBear?C.red:haQuality?.allBull?C.teal:C.mid},
+      {label:"Candle Pattern",      pts:sPAPat,   max:2,  value:pa?.patterns?.length>0?pa.patterns[0].name:"No pattern", color:pa?.patternBias>0?C.teal:pa?.patternBias<0?C.red:C.mid},
+      {label:"Breakout / Breakdown",pts:sPABrk,   max:2,  value:pa?.breakout20dHigh?"20D High ↑":pa?.breakout5dHigh?"5D High ↑":pa?.breakout20dLow?"20D Low ↓":"In Range", color:pa?.breakout20dHigh?C.teal:pa?.breakout20dLow?C.red:C.amber},
+      {label:"Trend Structure",     pts:sPAStr,   max:1,  value:pa?.hhll||"—",                          color:pa?.hhll==="HH+HL"?C.teal:pa?.hhll==="LH+LL"?C.red:C.amber},
+      {label:"Liquidity (Amihud)",  pts:sLiq,     max:1,  value:amihud<.5?"High":amihud<2?"Medium":"Low", color:amihud<.5?C.teal:amihud<2?C.amber:C.red},
+      {label:"CVaR (95%)",          pts:sCVaR,    max:0,  value:pct(cvar.cvar),           color:cvar.safe?C.teal:C.red},
     ]
   };
 }
@@ -710,8 +716,8 @@ const Divider=()=><div style={{width:1,background:"var(--border)",alignSelf:"str
 const HDiv  =()=><div style={{height:1,background:"var(--border)",width:"100%"}}/>;
 
 const Label=({children,style})=>(
-  <div style={{fontSize:11,color:"#A8B4C8",letterSpacing:2.5,textTransform:"uppercase",
-    marginBottom:7,fontWeight:600,...style}}>{children}</div>
+  <div style={{fontSize:13,color:"#C4CFDF",letterSpacing:2,textTransform:"uppercase",
+    marginBottom:8,fontWeight:700,...style}}>{children}</div>
 );
 const BigNum=({value,unit,color,size=32})=>(
   <div style={{display:"flex",alignItems:"baseline",gap:5}}>
@@ -723,13 +729,32 @@ const Card=({children,style})=>(
   <div style={{border:"1px solid var(--border)",borderRadius:4,padding:16,
     background:"var(--surface)",...style}}>{children}</div>
 );
-const FactorRow=({label,value,color})=>(
-  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-    padding:"7px 0",borderBottom:"1px solid var(--border)"}}>
-    <span style={{fontSize:13,color:"#B8C4D4"}}>{label}</span>
-    <span style={{fontSize:13,color,fontWeight:600,letterSpacing:.4}}>{value}</span>
-  </div>
-);
+const FactorRow=({label,value,color,pts,max})=>{
+  const scored=pts!==undefined&&pts!==0;
+  const isInfo=pts===0&&max===0; // display-only row, no score
+  const ptsTxt=pts>0?`+${pts}`:pts<0?`${pts}`:"0";
+  const ptsColor=pts>0?C.teal:pts<0?C.red:C.mid;
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+      padding:"7px 0",borderBottom:"1px solid var(--border)",gap:8}}>
+      <span style={{fontSize:13,color:"#B8C4D4",flex:1,minWidth:0}}>{label}</span>
+      <span style={{fontSize:13,color,fontWeight:600,letterSpacing:.4,flexShrink:0,maxWidth:130,textAlign:"right",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{value}</span>
+      {!isInfo?(
+        <div style={{flexShrink:0,minWidth:40,textAlign:"right"}}>
+          <span style={{
+            fontSize:11,fontWeight:700,letterSpacing:.5,
+            padding:"2px 6px",borderRadius:3,
+            background:`${ptsColor}18`,
+            border:`1px solid ${ptsColor}44`,
+            color:ptsColor,fontFamily:"'Courier New',monospace",
+          }}>{ptsTxt}{max>0?`/${max}`:""}</span>
+        </div>
+      ):(
+        <div style={{flexShrink:0,minWidth:40}}/>
+      )}
+    </div>
+  );
+};
 const RiskBar=({level,color})=>{
   const lvls=["LOW","MEDIUM","HIGH","EXTREME"],idx=lvls.indexOf(level);
   return(<div style={{display:"flex",gap:3,marginTop:7}}>
@@ -1353,8 +1378,24 @@ function App(){
 
               {/* Right: Factor table */}
               <Card>
-                <Label>Factor Breakdown (21 Factors)</Label>
-                {S.factors.map((f,i)=><FactorRow key={i} label={f.label} value={f.value} color={f.color}/>)}
+                <Label>Factor Breakdown (Score per Factor)</Label>
+                {S.factors.map((f,i)=><FactorRow key={i} label={f.label} value={f.value} color={f.color} pts={f.pts} max={f.max}/>)}
+                {/* Score total footer */}
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                  paddingTop:10,marginTop:4,borderTop:`1px solid ${S.aColor}40`}}>
+                  <span style={{fontSize:12,color:"var(--text-dim)",letterSpacing:1}}>COMPOSITE TOTAL</span>
+                  <div style={{display:"flex",alignItems:"baseline",gap:4}}>
+                    <span style={{fontSize:20,fontWeight:700,color:S.aColor}}>{S.score}</span>
+                    <span style={{fontSize:13,color:"var(--text-dim)"}}>/ {S.maxScore}</span>
+                    <span style={{fontSize:11,color:S.aColor,marginLeft:6,padding:"2px 8px",
+                      background:`${S.aColor}18`,border:`1px solid ${S.aColor}44`,borderRadius:3}}>
+                      {S.action}
+                    </span>
+                  </div>
+                </div>
+                <div style={{fontSize:10,color:"var(--text-dim)",marginTop:5,lineHeight:1.6}}>
+                  Score chip = points earned by this factor · max = maximum possible · info rows have no chip
+                </div>
               </Card>
             </div>
 
@@ -1539,7 +1580,7 @@ function App(){
             {/* Footer */}
             <div style={{fontSize:11,color:"var(--text-dim)",textAlign:"center",
               marginTop:22,paddingTop:12,borderTop:"1px solid var(--border)"}}>
-              QUANT EDGE v3.0 · HA · Fibonacci · Stoch RSI · VO · Data: Twelve Data API · {R.ts} · FOR RESEARCH USE ONLY — NOT FINANCIAL ADVICE
+              QUANT EDGE v3.0 · HA · Fibonacci · Stoch RSI · VO · Data: Twelve Data API · {R.ts}
             </div>
           </div>
         )}
