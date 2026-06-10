@@ -177,7 +177,7 @@ function analyze(dBars,hBars,ticker,macro){
   const a5=atr(dBars,5),a13=atr(dBars,13);
   const m13=mfi(dBars,13);
   const ob=obv(dBars);
-  const{e:efiV,mu:efiMu,sig:efiSig}=efi(dBars,13,55);
+  const{e:efiV,mu:efiMu,sig:efiSig}=efi(dBars,13,34);
   const r8=rsi(closes,8);
   const{h:mH}=macd(closes,13,21,8);
   const bw=bbw(closes,21);
@@ -219,11 +219,29 @@ function analyze(dBars,hBars,ticker,macro){
     const dEFIDir=curEFI!=null&&dEFIPrev!=null?(curEFI>dEFIPrev?'rising':'falling'):null;
     if(dEFIDir&&hEFIDir!=='n/a'&&dEFIDir!==hEFIDir)flowMixed=true;
   }
-  let f1=0,f1r='',f2=0,f2r='',f3=0,f3r='';
+  let f1=0,f1r='',f2=0,f2r='',f3=0,f3r='',f4=0,f4r='',f5=0,f5r='';
   if(curMFI!=null){if(curMFI>55&&obvSlope==='rising'){f1=1;f1r='MFI '+curMFI.toFixed(1)+' >55 + OBV rising';}else if(curMFI<45&&obvSlope==='falling'){f1=-1;f1r='MFI '+curMFI.toFixed(1)+' <45 + OBV falling';}else{f1r='MFI '+curMFI.toFixed(1)+', OBV '+obvSlope;}}
   if(curH!=null){if(curH>0&&histRising){f2=1;f2r='Hist +'+curH.toFixed(4)+' rising';}else if(curH<0&&!histRising){f2=-1;f2r='Hist '+curH.toFixed(4)+' falling';}else{f2r='Hist '+curH.toFixed(4)+' mixed';}}
   if(curRSI!=null){if(curRSI>55){f3=1;f3r='RSI '+curRSI.toFixed(1)+' >55';}else if(curRSI<45){f3=-1;f3r='RSI '+curRSI.toFixed(1)+' <45';}else{f3r='RSI '+curRSI.toFixed(1)+' neutral';}}
-  let score=f1+f2+f3;
+
+  // f4: EFI Momentum (Acceleration)
+  if(efiV[L]!=null&&efiV[L-1]!=null){
+    if(efiV[L]>efiV[L-1]){f4=1;f4r='EFI Force accelerating';}
+    else if(efiV[L]<efiV[L-1]){f4=-1;f4r='EFI Force decelerating';}
+    else{f4r='EFI Force flat';}
+  }else{f4r='EFI n/a';}
+
+  const avgVol = dBars.slice(Math.max(0, L - 19), L + 1).reduce((a, b) => a + (b.v || 0), 0) / 20;
+  const volRatio = avgVol > 0 ? dBars[L].v / avgVol : 0;
+
+  // f5: Vol Confirmation (VSA: Price direction + Relative Volume)
+  const isBullVol = (dBars[L].c > dBars[L].o) && (volRatio > 1.1);
+  const isBearVol = (dBars[L].c < dBars[L].o) && (volRatio > 1.1);
+  if(isBullVol){f5=1;f5r='High Vol Bull Candle';}
+  else if(isBearVol){f5=-1;f5r='High Vol Bear Candle';}
+  else{f5r='Vol alignment neutral';}
+
+  let score=f1+f2+f3+f4+f5;
   if(flowMixed)score=Math.max(-3,Math.min(3,score-1));
   const haBar=haD[L];
   const haBody=haBar?Math.abs(haBar.hc-haBar.ho)/(haBar.hh-haBar.hl||0.0001):0;
@@ -255,13 +273,11 @@ function analyze(dBars,hBars,ticker,macro){
     if(!macroPass){signal='NO TRADE — macro blocked';sigClass='sig-none';}
   }
 
-  const avgVol = dBars.slice(Math.max(0, L - 19), L + 1).reduce((a, b) => a + (b.v || 0), 0) / 20;
-  const volRatio = dBars[L].v / avgVol;
   const volState = volRatio > 1.5 ? 'High' : volRatio < 0.7 ? 'Low' : 'Normal';
   const volAnalysis = `${volState} Vol / ${obvSlope} OBV`;
 
   return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowMixed,curEFI,curMu,curSig,
-    f1,f1r,f2,f2r,f3,f3r,score,infFlow,haBody:haBody.toFixed(3),
+    f1,f1r,f2,f2r,f3,f3r,f4,f4r,f5,f5r,score,infFlow,haBody:haBody.toFixed(3),
     signal,sigClass,a5:a5[L],a13:a13[L],bbwState:bbwExp?'expanding':'contracting',
     hHA,hRSI,hOBV,hEFIDir,entryReady,ticker,date:dBars[L].date.toLocaleDateString(),
     macroPass,macroReason,spyAbove,qqqAbove,vixOk,
@@ -305,6 +321,8 @@ function render(r){
 '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f1r+'</span>'+fb(r.f1)+'</div>'+
 '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f2r+'</span>'+fb(r.f2)+'</div>'+
 '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f3r+'</span>'+fb(r.f3)+'</div>'+
+'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f4r+'</span>'+fb(r.f4)+'</div>'+
+'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f5r+'</span>'+fb(r.f5)+'</div>'+
 '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>'+sb(r.score)+(r.flowMixed?'<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>':'')+'</div></div>'+
 '<div class="sig '+r.sigClass+'"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">'+r.signal+'</div></div>'+
 '<div class="card"><div class="s-title">4 &middot; Adverse selection</div>'+
