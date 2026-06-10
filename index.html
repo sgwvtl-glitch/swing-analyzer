@@ -72,7 +72,7 @@
 <h1>Fibonacci Swing Analyzer</h1>
 <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
 <form class="row" onsubmit="event.preventDefault(); run();">
-  <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY"/>
+  <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
   <button type="submit" id="btn">Analyze</button>
 </form>
 <div id="st"></div>
