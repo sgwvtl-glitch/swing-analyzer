@@ -74,7 +74,6 @@
 <form class="row" onsubmit="event.preventDefault(); run();">
   <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY"/>
   <button type="submit" id="btn">Analyze</button>
-  <button type="button" onclick="toggleAuto()" id="autobtn" style="background:#eaf3de;border-color:#3b6d11;color:#27500a">Auto OFF</button>
 </form>
 <div id="st"></div>
 <div id="res"></div>
@@ -256,6 +255,11 @@ function analyze(dBars,hBars,ticker,macro){
     if(!macroPass){signal='NO TRADE — macro blocked';sigClass='sig-none';}
   }
 
+  const avgVol = dBars.slice(Math.max(0, L - 19), L + 1).reduce((a, b) => a + (b.v || 0), 0) / 20;
+  const volRatio = dBars[L].v / avgVol;
+  const volState = volRatio > 1.5 ? 'High' : volRatio < 0.7 ? 'Low' : 'Normal';
+  const volAnalysis = `${volState} Vol / ${obvSlope} OBV`;
+
   return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowMixed,curEFI,curMu,curSig,
     f1,f1r,f2,f2r,f3,f3r,score,infFlow,haBody:haBody.toFixed(3),
     signal,sigClass,a5:a5[L],a13:a13[L],bbwState:bbwExp?'expanding':'contracting',
@@ -263,13 +267,21 @@ function analyze(dBars,hBars,ticker,macro){
     macroPass,macroReason,spyAbove,qqqAbove,vixOk,
     spyPrice:macro?macro.spyPrice:null,spyEMA:macro?macro.spyEMA:null,
     qqqPrice:macro?macro.qqqPrice:null,qqqEMA:macro?macro.qqqEMA:null,
-    vix:macro?macro.vix:null};
+    vix:macro?macro.vix:null,
+    volAnalysis};
 }
 function b(t,c){return'<span class="badge '+c+'">'+t+'</span>';}
 function fb(s){return s===1?b('+1','bg'):s===-1?b('-1','br'):b('0','bn');}
 function sb(s){return s>0?b('+'+s,'bg'):s<0?b(s,'br'):b('0','bn');}
 function fmt(v,d){d=d||3;return v!=null?Number(v).toFixed(d):'n/a';}
-function fmtE(v){return v!=null?Number(v).toExponential(2):'n/a';}
+function fmtE(v){
+  if(v==null)return 'n/a';
+  const absV=Math.abs(v);
+  if(absV>=1e9)return(v/1e9).toFixed(2)+'B';
+  if(absV>=1e6)return(v/1e6).toFixed(2)+'M';
+  if(absV>=1e3)return(v/1e3).toFixed(2)+'K';
+  return v.toFixed(2);
+}
 function render(r){
   const regC=r.regime==='Trending'?'bg':r.regime==='Volatile'?'br':r.regime==='Mean-reverting'?'bw':'bn';
   const flowC=r.flow==='CLEAN'?'bg':r.flow.indexOf('TOXIC')>=0?'br':'bw';
@@ -281,8 +293,9 @@ function render(r){
 '<div class="card"><div class="s-title">Step 0 &middot; Macro gate</div>'+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.macroPass===false?'Macro blocked':'Macro pass',r.macroPass===false?'br':'bg')+(r.macroReason?'<span style="font-size:12px;color:#a32d2d;margin-left:6px">'+r.macroReason+'</span>':'')+'</div>'+'<div class="g3">'+'<div><div class="lbl">SPY vs EMA(21)</div><div class="val">'+(r.spyPrice!=null?r.spyPrice.toFixed(2):'--')+' '+b(r.spyAbove===true?'above':'below',r.spyAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">'+(r.qqqPrice!=null?r.qqqPrice.toFixed(2):'--')+' '+b(r.qqqAbove===true?'above':'below',r.qqqAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">VIX</div><div class="val">'+(r.vix!=null?r.vix.toFixed(2):'--')+' '+b(r.vix!=null?(r.vix<25?'normal':'elevated'):'--',r.vix!=null?(r.vix<25?'bg':'bw'):'bn')+'</div></div>'+'</div></div>'+
 '<div class="card"><div class="s-title">1 &middot; Regime</div>'+
 '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+b(r.regime,regC)+'<span style="font-size:12px;color:#888780">'+r.regAct+'</span></div>'+
-'<div class="g2"><div><div class="lbl">ADX(13)</div><div class="val">'+fmt(r.curAr,1)+'</div></div>'+
-'<div><div class="lbl">BBW(21)</div><div class="val">'+fmt(r.curBBW,4)+' <span style="font-size:11px;color:#888780">'+r.bbwState+'</span></div></div></div></div>'+
+'<div class="g3"><div><div class="lbl">ADX(13)</div><div class="val">'+fmt(r.curAr,1)+'</div></div>'+
+'<div><div class="lbl">BBW(21)</div><div class="val">'+fmt(r.curBBW,4)+' <span style="font-size:11px;color:#888780">'+r.bbwState+'</span></div></div>'+
+'<div><div class="lbl">Vol Analysis</div><div class="val">'+r.volAnalysis+'</div></div></div></div>'+
 '<div class="card"><div class="s-title">2 &middot; Toxic flow check (EFI)</div>'+
 '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.flow,flowC)+(r.flowMixed?b('MIXED &mdash; 1H contradicts daily','bw'):'')+'</div>'+
 '<div class="g3"><div><div class="lbl">EFI(13) current</div><div class="val mono">'+fmtE(r.curEFI)+'</div></div>'+
