@@ -71,11 +71,11 @@
 <body>
 <h1>Fibonacci Swing Analyzer</h1>
 <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
-<div class="row">
+<form class="row" onsubmit="event.preventDefault(); run();">
   <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY"/>
-  <button onclick="run()" id="btn">Analyze</button>
-  <button onclick="toggleAuto()" id="autobtn" style="background:#eaf3de;border-color:#3b6d11;color:#27500a">Auto OFF</button>
-</div>
+  <button type="submit" id="btn">Analyze</button>
+  <button type="button" onclick="toggleAuto()" id="autobtn" style="background:#eaf3de;border-color:#3b6d11;color:#27500a">Auto OFF</button>
+</form>
 <div id="st"></div>
 <div id="res"></div>
 <script>
@@ -136,6 +136,16 @@ async function fetchBars(ticker,interval,range,stEl){
   throw new Error('All sources failed: '+lastErr.message);
 }
 
+async function fetchVIX() {
+  const PROXY_URL = 'https://vix-proxy.onrender.com//vix';
+  const r = await fetch(PROXY_URL, { signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+  const j = await r.json();
+  const price = j.price;
+  const prev = j.previousClose;
+  return { price, pct: prev ? (price - prev) / prev * 100 : null };
+}
+
 async function fetchMacro(stEl){
   if(stEl)stEl.textContent='Fetching macro data...';
   const B='https://api.twelvedata.com';
@@ -144,7 +154,7 @@ async function fetchMacro(stEl){
   let sp=null,se=null,qp=null,qe=null,vix=null;
   try{[sp,se]=await Promise.all([px('SPY'),em('SPY',21)]);}catch(e){}
   try{[qp,qe]=await Promise.all([px('QQQ'),em('QQQ',21)]);}catch(e){}
-  try{vix=await px('VIX');}catch(e){}
+  try{const v=await fetchVIX();vix=v.price;}catch(e){}
   return{spyPrice:sp,spyEMA:se,qqqPrice:qp,qqqEMA:qe,vix};
 }
 
