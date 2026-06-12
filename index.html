@@ -391,12 +391,12 @@ function toggleAuto(){
     var tk=document.getElementById('tk').value.trim().toUpperCase();
     if(!tk){autoOn=false;return;}
     btn.textContent='Auto ON';
-    btn.style.background='#173404';btn.style.borderColor='#3b6d11';btn.style.color='#c0dd97';
+    btn.style.background='#064e3b';btn.style.borderColor='#064e3b';btn.style.color='#34d399';
     startAutoRefresh();
     run();
   }else{
     btn.textContent='Auto OFF';
-    btn.style.background='#eaf3de';btn.style.borderColor='#3b6d11';btn.style.color='#27500a';
+    btn.style.background='#dcfce7';btn.style.borderColor='#166534';btn.style.color='#166534';
     stopAutoRefresh();
   }
 }
