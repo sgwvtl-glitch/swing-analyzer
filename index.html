@@ -6,6 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fibonacci Swing Analyzer</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -13,75 +15,108 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f8fafc;
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
       color: #0f172a;
-      padding: 1.5rem;
-      max-width: 720px;
-      margin: 0 auto
+      padding: 2rem 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      min-height: 100vh;
+    }
+
+    .header-container {
+      max-width: 800px;
+      margin: 0 auto 2rem auto;
+      text-align: center;
     }
 
     h1 {
-      font-size: 18px;
-      font-weight: 500;
-      margin-bottom: 4px
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .sub {
-      font-size: 12px;
+      font-size: 13px;
       color: #64748b;
-      margin-bottom: 1.25rem
+      margin-bottom: 1.5rem
     }
 
     input[type=text] {
       font-size: 14px;
-      padding: 8px 12px;
-      border: 1px solid #d3d1c7;
-      border-radius: 8px;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
       background: #fff;
-      color: #1a1a18;
-      width: 220px;
-      outline: none
+      color: #0f172a;
+      width: 280px;
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
     }
 
     input[type=text]:focus {
-      border-color: #888780
+      border-color: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
     }
 
     button {
-      font-size: 13px;
-      padding: 8px 16px;
-      border: 1px solid #d3d1c7;
-      border-radius: 8px;
-      background: #fff;
-      color: #1a1a18;
-      cursor: pointer
+      font-size: 14px;
+      font-weight: 500;
+      padding: 10px 18px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #0f172a;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease;
     }
 
     button:hover {
-      background: #f1efe8
+      background: #1e293b;
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
     }
 
     button:disabled {
       opacity: .5;
-      cursor: not-allowed
+      cursor: not-allowed;
+      transform: none;
     }
 
     .card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 10px
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      border-radius: 14px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+      transform: translateY(-1px);
     }
 
     .s-title {
       font-size: 11px;
-      font-weight: 500;
+      font-weight: 600;
       color: #64748b;
       letter-spacing: .05em;
       text-transform: uppercase;
-      margin-bottom: 8px
+      margin-bottom: 10px;
+      border-left: 3px solid #64748b;
+      padding-left: 6px;
     }
 
     .lbl {
@@ -93,20 +128,52 @@
     .val {
       font-size: 15px;
       font-weight: 500;
-      color: #1a1a18
+      color: #0f172a
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    .col-left, .col-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+      body {
+        padding: 1rem;
+      }
+      input[type=text] {
+        width: 100%;
+      }
+      .row {
+        flex-direction: column;
+        align-items: stretch !important;
+      }
+      button {
+        width: 100%;
+      }
     }
 
     .g2 {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
       margin-top: 10px
     }
 
     .g3 {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      gap: 12px;
       margin-top: 10px
     }
 
@@ -114,41 +181,48 @@
       display: inline-block;
       padding: 3px 9px;
       border-radius: 8px;
-      font-size: 12px;
-      font-weight: 500
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
     .bg {
       background: #dcfce7;
-      color: #166534
+      color: #15803d;
+      border: 1px solid rgba(22, 163, 74, 0.2);
     }
 
     .br {
       background: #fee2e2;
-      color: #991b1b
+      color: #b91c1c;
+      border: 1px solid rgba(220, 38, 38, 0.2);
     }
 
     .bw {
       background: #fef3c7;
-      color: #92400e
+      color: #b45309;
+      border: 1px solid rgba(217, 119, 6, 0.2);
     }
 
     .bi {
       background: #dbeafe;
-      color: #1e40af
+      color: #1d4ed8;
+      border: 1px solid rgba(37, 99, 235, 0.2);
     }
 
     .bn {
       background: #f1f5f9;
-      color: #475569
+      color: #475569;
+      border: 1px solid rgba(71, 85, 105, 0.2);
     }
 
     .frow {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #f1efe8
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9
     }
 
     .frow:last-child {
@@ -157,29 +231,35 @@
 
     .sig {
       text-align: center;
-      padding: 1.25rem;
-      border-radius: 12px;
-      margin-bottom: 10px
+      padding: 1.5rem;
+      border-radius: 14px;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
     }
 
     .sig-long {
-      background: #dcfce7
+      background: #f0fdf4;
+      border-color: #bbf7d0;
     }
 
     .sig-short {
-      background: #fee2e2
+      background: #fef2f2;
+      border-color: #fecaca;
     }
 
     .sig-none {
-      background: #f1f5f9
+      background: #f8fafc;
+      border-color: #e2e8f0;
     }
 
     .sig-long .sv {
-      color: #166534
+      color: #15803d
     }
 
     .sig-short .sv {
-      color: #991b1b
+      color: #b91c1c
     }
 
     .sig-none .sv {
@@ -187,8 +267,9 @@
     }
 
     .sv {
-      font-size: 22px;
-      font-weight: 500
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
 
     .mono {
@@ -199,59 +280,82 @@
     .row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 6px
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 8px
     }
 
     #st {
       font-size: 13px;
       color: #64748b;
       min-height: 18px;
-      margin-bottom: 8px
+      margin-bottom: 8px;
+      margin-top: 10px;
     }
 
     .sz-box {
-      padding: 10px;
-      background: #f1f5f9;
-      border-radius: 8px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 10px;
       font-size: 13px;
-      line-height: 1.6
+      line-height: 1.6;
+      border: 1px solid #e2e8f0;
     }
 
     #timer-bar {
-      background: #fff;
-      color: #5f5e5a
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(8px);
+      border-top: 1px solid #e2e8f0;
+      box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
+      color: #475569
     }
 
     @media(prefers-color-scheme:dark) {
       body {
-        background: #0f172a;
+        background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
         color: #f8fafc
       }
 
+      h1 {
+        background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
       .card {
-        background: #1e293b;
-        border-color: #334155
+        background: rgba(30, 41, 59, 0.7);
+        border-color: rgba(51, 65, 85, 0.8);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+      }
+
+      .card:hover {
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+      }
+
+      .s-title {
+        color: #94a3b8;
+        border-left-color: #94a3b8;
       }
 
       input[type=text] {
-        background: #2c2c2a;
-        color: #e8e6df;
-        border-color: #444441
+        background: #1e293b;
+        color: #f8fafc;
+        border-color: #334155
       }
 
       input[type=text]:focus {
-        border-color: #888780
+        border-color: #475569;
+        box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.3);
       }
 
       button {
-        background: #2c2c2a;
-        color: #e8e6df;
-        border-color: #444441
+        background: #f8fafc;
+        color: #0f172a;
+        border-color: #f8fafc;
       }
 
       button:hover {
-        background: #3a3a38
+        background: #e2e8f0;
       }
 
       .lbl {
@@ -263,48 +367,52 @@
       }
 
       .frow {
-        border-color: #3a3a38
-      }
-
-      .s-title {
-        color: #94a3b8
+        border-color: #334155
       }
 
       .bg {
-        background: #064e3b;
-        color: #34d399
+        background: rgba(6, 78, 59, 0.2);
+        color: #34d399;
+        border-color: rgba(52, 211, 153, 0.2);
       }
 
       .br {
-        background: #7f1d1d;
-        color: #f87171
+        background: rgba(127, 29, 29, 0.2);
+        color: #f87171;
+        border-color: rgba(248, 113, 113, 0.2);
       }
 
       .bw {
-        background: #78350f;
-        color: #fbbf24
+        background: rgba(120, 53, 15, 0.2);
+        color: #fbbf24;
+        border-color: rgba(251, 191, 36, 0.2);
       }
 
       .bi {
-        background: #1e3a8a;
-        color: #60a5fa
+        background: rgba(30, 58, 138, 0.2);
+        color: #60a5fa;
+        border-color: rgba(96, 165, 250, 0.2);
       }
 
       .bn {
-        background: #334155;
-        color: #cbd5e1
+        background: rgba(51, 65, 85, 0.2);
+        color: #cbd5e1;
+        border-color: rgba(203, 213, 225, 0.2);
       }
 
       .sig-long {
-        background: #064e3b
+        background: rgba(6, 78, 59, 0.2);
+        border-color: #059669;
       }
 
       .sig-short {
-        background: #7f1d1d
+        background: rgba(127, 29, 29, 0.2);
+        border-color: #dc2626;
       }
 
       .sig-none {
-        background: #334155
+        background: rgba(51, 65, 85, 0.2);
+        border-color: #475569;
       }
 
       .sig-long .sv {
@@ -320,7 +428,8 @@
       }
 
       .sz-box {
-        background: #334155
+        background: #1e293b;
+        border-color: #334155;
       }
 
       #st {
@@ -328,23 +437,26 @@
       }
 
       #timer-bar {
-        background: #2c2c2a;
-        border-color: #444441;
-        color: #b4b2a9
+        background: rgba(30, 41, 59, 0.9);
+        border-color: #334155;
+        box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
+        color: #cbd5e1
       }
     }
   </style>
 </head>
 
 <body>
-  <h1>Fibonacci Swing Analyzer</h1>
-  <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
-  <form class="row" onsubmit="event.preventDefault(); run();">
-    <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY" style="text-transform: uppercase;"
-      oninput="this.value = this.value.toUpperCase()" />
-    <button type="submit" id="btn">Analyze</button>
-  </form>
-  <div id="st"></div>
+  <div class="header-container">
+    <h1>Fibonacci Swing Analyzer</h1>
+    <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
+    <form class="row" onsubmit="event.preventDefault(); run();">
+      <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY" style="text-transform: uppercase;"
+        oninput="this.value = this.value.toUpperCase()" />
+      <button type="submit" id="btn">Analyze</button>
+    </form>
+    <div id="st"></div>
+  </div>
   <div id="res"></div>
   <script>
     const TD_KEY = '934f233f1c934c92a767bb9e52191d6d';
@@ -439,158 +551,6 @@
     function macd(closes, f, s, sg) { const ef = ema(closes, f), es = ema(closes, s); const ml = closes.map((_, i) => ef[i] != null && es[i] != null ? ef[i] - es[i] : null); const sl = ema(ml, sg); const h = ml.map((v, i) => v != null && sl[i] != null ? v - sl[i] : null); return { ml, sl, h }; }
     function bbw(closes, n) { const m = sma(closes, n); const o = new Array(closes.length).fill(null); for (let i = n - 1; i < closes.length; i++) { const sl = closes.slice(i - n + 1, i + 1); const mn = m[i]; const sd = Math.sqrt(sl.reduce((a, b) => a + (b - mn) ** 2, 0) / n); if (mn !== 0) o[i] = (4 * sd) / mn; } return o; }
     function adx(bars, n) { const tr = [], pdm = [], ndm = []; for (let i = 1; i < bars.length; i++) { const h = bars[i].h, l = bars[i].l, ph = bars[i - 1].h, pl = bars[i - 1].l, pc = bars[i - 1].c; tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc))); const up = h - ph, dn = pl - l; pdm.push(up > dn && up > 0 ? up : 0); ndm.push(dn > up && dn > 0 ? dn : 0); } const atr = wilder(tr, n), ap = wilder(pdm, n), an = wilder(ndm, n); const o = new Array(bars.length).fill(null); const dx = []; for (let i = 0; i < atr.length; i++) { if (atr[i] == null || atr[i] === 0) { dx.push(null); continue; } const pi = 100 * ap[i] / atr[i], ni = 100 * an[i] / atr[i]; const d = pi + ni === 0 ? null : 100 * Math.abs(pi - ni) / (pi + ni); dx.push(d); } const adxArr = wilder(dx, n); for (let i = 0; i < adxArr.length; i++)o[i + 1] = adxArr[i]; return o; }
-    function getSMC(bars) {
-      const n = bars.length;
-      if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
-
-      const swings = [];
-      const win = 3;
-      for (let i = win; i < n - win; i++) {
-        let isHigh = true, isLow = true;
-        for (let j = i - win; j <= i + win; j++) {
-          if (j === i) continue;
-          if (bars[j].h > bars[i].h) isHigh = false;
-          if (bars[j].l < bars[i].l) isLow = false;
-        }
-        if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
-        if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
-      }
-
-      let structure = 'neutral', lastEvent = 'none', lastS = null;
-      let highRef = swings.filter(s => s.type === 'high').pop()?.val;
-      let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
-
-      for (let i = 0; i < n; i++) {
-        const c = bars[i].c;
-        if (highRef && c > highRef) {
-          const isChoCH = structure === 'bearish';
-          structure = 'bullish';
-          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-          lastS = i;
-          highRef = Math.max(...bars.slice(i).map(b => b.h));
-        } else if (lowRef && c < lowRef) {
-          const isChoCH = structure === 'bullish';
-          structure = 'bearish';
-          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-          lastS = i;
-          lowRef = Math.min(...bars.slice(i).map(b => b.l));
-        }
-      }
-
-      const fvgs = [];
-      for (let i = 1; i < n - 1; i++) {
-        if (bars[i - 1].h < bars[i + 1].l) fvgs.push({ type: 'bull', top: bars[i + 1].l, bot: bars[i - 1].h });
-        if (bars[i - 1].l > bars[i + 1].h) fvgs.push({ type: 'bear', top: bars[i - 1].l, bot: bars[i + 1].h });
-      }
-
-      const obs = [];
-      if (lastS !== null) {
-        const start = Math.max(0, lastS - 5);
-        for (let i = start; i < lastS; i++) {
-          if (structure === 'bullish' && bars[i].c < bars[i].o) {
-            obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
-            break;
-          }
-          if (structure === 'bearish' && bars[i].c > bars[i].o) {
-            obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
-            break;
-          }
-        }
-      }
-
-      const curP = bars[n - 1].c;
-      let poi = 'none';
-      let breakdown = { structure: 0, ob: 0, fvg: 0 };
-
-      if (structure === 'bullish') {
-        breakdown.structure = 1;
-        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
-        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
-      } else if (structure === 'bearish') {
-        breakdown.structure = -1;
-        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
-        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
-      }
-
-      return { structure, lastEvent, poi, breakdown };
-    }
-
-    function getSMC(bars) {
-      const n = bars.length;
-      if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
-
-      const swings = [];
-      const win = 3;
-      for (let i = win; i < n - win; i++) {
-        let isHigh = true, isLow = true;
-        for (let j = i - win; j <= i + win; j++) {
-          if (j === i) continue;
-          if (bars[j].h > bars[i].h) isHigh = false;
-          if (bars[j].l < bars[i].l) isLow = false;
-        }
-        if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
-        if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
-      }
-
-      let structure = 'neutral', lastEvent = 'none', lastS = null;
-      let highRef = swings.filter(s => s.type === 'high').pop()?.val;
-      let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
-
-      for (let i = 0; i < n; i++) {
-        const c = bars[i].c;
-        if (highRef && c > highRef) {
-          const isChoCH = structure === 'bearish';
-          structure = 'bullish';
-          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-          lastS = i;
-          highRef = Math.max(...bars.slice(i).map(b => b.h));
-        } else if (lowRef && c < lowRef) {
-          const isChoCH = structure === 'bullish';
-          structure = 'bearish';
-          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-          lastS = i;
-          lowRef = Math.min(...bars.slice(i).map(b => b.l));
-        }
-      }
-
-      const fvgs = [];
-      for (let i = 1; i < n - 1; i++) {
-        if (bars[i - 1].h < bars[i + 1].l) fvgs.push({ type: 'bull', top: bars[i + 1].l, bot: bars[i - 1].h });
-        if (bars[i - 1].l > bars[i + 1].h) fvgs.push({ type: 'bear', top: bars[i - 1].l, bot: bars[i + 1].h });
-      }
-
-      const obs = [];
-      if (lastS !== null) {
-        const start = Math.max(0, lastS - 5);
-        for (let i = start; i < lastS; i++) {
-          if (structure === 'bullish' && bars[i].c < bars[i].o) {
-            obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
-            break;
-          }
-          if (structure === 'bearish' && bars[i].c > bars[i].o) {
-            obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
-            break;
-          }
-        }
-      }
-
-      const curP = bars[n - 1].c;
-      let poi = 'none';
-      let breakdown = { structure: 0, ob: 0, fvg: 0 };
-
-      if (structure === 'bullish') {
-        breakdown.structure = 1;
-        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
-        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
-      } else if (structure === 'bearish') {
-        breakdown.structure = -1;
-        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
-        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
-      }
-
-      return { structure, lastEvent, poi, breakdown };
-    }
-
     function getSMC(bars) {
       const n = bars.length;
       if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
@@ -815,45 +775,107 @@
       const entTxt = r.entryReady ? 'READY' : r.hHA === 'n/a' ? 'NO 1H DATA' : 'PENDING';
       const infC = r.infFlow ? 'bw' : 'bg';
       const sigW = r.curSig != null ? '&plusmn;' + fmtE(2 * r.curSig) : 'n/a';
+      
       document.getElementById('res').innerHTML =
-        '<div class="card"><div class="s-title">Step 0 &middot; Macro gate</div>' + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.macroPass === false ? 'Macro blocked' : 'Macro pass', r.macroPass === false ? 'br' : 'bg') + (r.macroReason ? '<span style="font-size:12px;color:#a32d2d;margin-left:6px">' + r.macroReason + '</span>' : '') + '</div>' + '<div class="g3">' + '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' + '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' + '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' + '</div></div>' +
-        '<div class="card"><div class="s-title">1 &middot; Regime</div>' +
-        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' + b(r.regime, regC) + '<span style="font-size:12px;color:#888780">' + r.regAct + '</span></div>' +
-        '<div class="g3"><div><div class="lbl">ADX(13)</div><div class="val">' + fmt(r.curAr, 1) + '</div></div>' +
-        '<div><div class="lbl">BBW(21)</div><div class="val">' + fmt(r.curBBW, 4) + ' <span style="font-size:11px;color:#888780">' + r.bbwState + '</span></div></div>' +
-        '<div><div class="lbl">Vol Analysis</div><div class="val">' + r.volAnalysis + '</div></div></div></div>' +
-        '<div class="card"><div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
-        '<div class="g3"><div><div class="lbl">EFI(13) current</div><div class="val mono">' + fmtE(r.curEFI) + '</div></div>' +
-        '<div><div class="lbl">55D mean</div><div class="val mono">' + fmtE(r.curMu) + '</div></div>' +
-        '<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">' + sigW + '</div></div></div></div>' +
-        '<div class="card"><div class="s-title">3 &middot; Alpha score</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f1r + '</span>' + fb(r.f1) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f2r + '</span>' + fb(r.f2) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
-        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
-        '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>' : '') + '</div></div>' +
-        '<div class="sig ' + r.sigClass + '"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">' + r.signal + '</div></div>' +
-        '<div class="card"><div class="s-title">4 &middot; Adverse selection</div>' +
-        '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
-        '<div class="g2"><div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>' +
-        '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div></div></div>' +
-        '<div class="card"><div class="s-title">5 &middot; Volatility state</div>' +
-        '<div class="g2"><div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
-        '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div></div>' +
-        '<div style="margin-top:8px;font-size:12px;color:#888780">Switch to static ATR at day 8 of hold</div></div>' +
-        '<div class="card"><div class="s-title">6 &middot; Position size</div>' +
-        '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#888780">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div></div>' +
-        '<div class="card"><div class="s-title">7 &middot; 1H entry timing</div>' +
-        '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
-        '<div class="g2"><div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
-        '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
-        '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
-        '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div></div></div>';
+        '<div class="dashboard-grid">' +
+          '<div class="col-left">' +
+            // Signal Card
+            '<div class="sig ' + r.sigClass + '">' +
+              '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
+              '<div class="sv">' + r.signal + '</div>' +
+            '</div>' +
+            
+            // Step 0 - Macro Gate Card
+            '<div class="card">' +
+              '<div class="s-title">Step 0 &middot; Macro gate</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+                b(r.macroPass === false ? 'Macro blocked' : 'Macro pass', r.macroPass === false ? 'br' : 'bg') +
+                (r.macroReason ? '<span style="font-size:12px;color:#b91c1c;margin-left:6px">' + r.macroReason + '</span>' : '') +
+              '</div>' +
+              '<div class="g3">' +
+                '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' +
+                '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' +
+                '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' +
+              '</div>' +
+            '</div>' +
+            
+            // Step 3 - Alpha Score Card
+            '<div class="card">' +
+              '<div class="s-title">3 &middot; Alpha score</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f1r + '</span>' + fb(r.f1) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f2r + '</span>' + fb(r.f2) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
+              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
+              '<div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:600">Total Score</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#b45309;font-weight:500">(-1 for mixed flow)</span>' : '') + '</div>' +
+            '</div>' +
+          '</div>' +
+          
+          '<div class="col-right">' +
+            // Step 1 - Regime Card
+            '<div class="card">' +
+              '<div class="s-title">1 &middot; Regime</div>' +
+              '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + b(r.regime, regC) + '<span style="font-size:12px;color:#64748b">' + r.regAct + '</span></div>' +
+              '<div class="g3">' +
+                '<div><div class="lbl">ADX(13)</div><div class="val">' + fmt(r.curAr, 1) + '</div></div>' +
+                '<div><div class="lbl">BBW(21)</div><div class="val">' + fmt(r.curBBW, 4) + ' <span style="font-size:11px;color:#64748b">' + r.bbwState + '</span></div></div>' +
+                '<div><div class="lbl">Vol Analysis</div><div class="val">' + r.volAnalysis + '</div></div>' +
+              '</div>' +
+            '</div>' +
+            
+            // Step 2 - Toxic Flow Check Card
+            '<div class="card">' +
+              '<div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
+              '<div class="g3">' +
+                '<div><div class="lbl">EFI(13) current</div><div class="val mono">' + fmtE(r.curEFI) + '</div></div>' +
+                '<div><div class="lbl">55D mean</div><div class="val mono">' + fmtE(r.curMu) + '</div></div>' +
+                '<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">' + sigW + '</div></div>' +
+              '</div>' +
+            '</div>' +
+            
+            // Step 4 - Adverse Selection Card
+            '<div class="card">' +
+              '<div class="s-title">4 &middot; Adverse selection</div>' +
+              '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
+              '<div class="g2">' +
+                '<div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#64748b">/ 0.618</span></div></div>' +
+                '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div>' +
+              '</div>' +
+            '</div>' +
+            
+            // Step 5 - Volatility State Card
+            '<div class="card">' +
+              '<div class="s-title">5 &middot; Volatility state</div>' +
+              '<div class="g2">' +
+                '<div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
+                '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div>' +
+              '</div>' +
+              '<div style="margin-top:10px;font-size:12px;color:#64748b;font-style:italic">Switch to static ATR at day 8 of hold</div>' +
+            '</div>' +
+            
+            // Step 6 - Position Size Card
+            '<div class="card">' +
+              '<div class="s-title">6 &middot; Position size</div>' +
+              '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#64748b">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div>' +
+            '</div>' +
+            
+            // Step 7 - 1H Entry Timing Card
+            '<div class="card">' +
+              '<div class="s-title">7 &middot; 1H entry timing</div>' +
+              '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
+              '<div class="g2">' +
+                '<div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
+                '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
+                '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
+                '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
     }
     let retryTimer = null, autoTimer = null, countdownTimer = null, autoOn = false;
     function clearRetry() { if (retryTimer) { clearInterval(retryTimer); retryTimer = null; } }
