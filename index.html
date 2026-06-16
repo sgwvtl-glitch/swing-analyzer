@@ -741,24 +741,18 @@
       else if (isBearVol) { f5 = -1; f5r = 'High Vol Bear Candle'; }
       else { f5r = 'Vol alignment neutral'; }
 
-      let score = f1 + f2 + f3 + f4 + f5;
-
-      // SMC Score Integration (Max 5 points: structure 1, OB 3, FVG 1)
       const smc = getSMC(dBars);
-      const smcPoints = smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
+      let score = f1 + f2 + f3 + f4 + f5 + smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
 
-      if (score >= 0) score += Math.max(0, smcPoints);
-      else score += Math.min(0, smcPoints);
-
-      if (flowMixed) score = Math.max(-3, Math.min(3, score - 1));
+    if (flowMixed) score -= 1;
       const haBar = haD[L];
       const haBody = haBar ? Math.abs(haBar.hc - haBar.ho) / (haBar.hh - haBar.hl || 0.0001) : 0;
       const infFlow = haBody > 0.618 && a5[L] != null && Math.abs(dBars[L].c - dBars[L - 1].c) > a5[L];
       if (infFlow) regMult = Math.min(regMult, 0.618);
       let signal, sigClass;
       if (flow !== 'CLEAN') { signal = 'NO TRADE — ' + flow; sigClass = 'sig-none'; }
-      else if (score >= 2) { signal = score === 3 ? 'LONG — full position' : 'LONG — reduced position'; sigClass = 'sig-long'; }
-      else if (score <= -2) { signal = score === -3 ? 'SHORT — full position' : 'SHORT — reduced position'; sigClass = 'sig-short'; }
+      else if (score >= 4) { signal = score >= 7 ? 'LONG — full position' : 'LONG — reduced position'; sigClass = 'sig-long'; }
+      else if (score <= -4) { signal = score <= -7 ? 'SHORT — full position' : 'SHORT — reduced position'; sigClass = 'sig-short'; }
       else { signal = 'NO TRADE — wait for alignment'; sigClass = 'sig-none'; }
       const aligned = (signal.includes('LONG') && hHA === 'bullish') || (signal.includes('SHORT') && hHA === 'bearish');
       const rsiOK = (signal.includes('LONG') && hRSI != null && hRSI > 55) || (signal.includes('SHORT') && hRSI != null && hRSI < 45);
@@ -768,7 +762,7 @@
       if (macro) {
         spyAbove = macro.spyPrice != null && macro.spyEMA != null ? macro.spyPrice > macro.spyEMA : null;
         qqqAbove = macro.qqqPrice != null && macro.qqqEMA != null ? macro.qqqPrice > macro.qqqEMA : null;
-        var isLong = score >= 2, isShort = score <= -2;
+        var isLong = score >= 4, isShort = score <= -4;
         if (isLong) {
           vixOk = macro.vix != null ? macro.vix < 25 : null;
           var pts = (spyAbove === true ? 1 : 0) + (qqqAbove === true ? 1 : 0) + (vixOk === true ? 1 : 0);
@@ -839,6 +833,9 @@
         '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
         '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
         '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
         '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>' : '') + '</div></div>' +
         '<div class="sig ' + r.sigClass + '"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">' + r.signal + '</div></div>' +
         '<div class="card"><div class="s-title">4 &middot; Adverse selection</div>' +
