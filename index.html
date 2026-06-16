@@ -1,563 +1,982 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Fibonacci Swing Analyzer</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;color:#0f172a;padding:1.5rem;max-width:720px;margin:0 auto}
-  h1{font-size:18px;font-weight:500;margin-bottom:4px}
-  .sub{font-size:12px;color:#64748b;margin-bottom:1.25rem}
-  input[type=text]{font-size:14px;padding:8px 12px;border:1px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;width:220px;outline:none}
-  input[type=text]:focus{border-color:#888780}
-  button{font-size:13px;padding:8px 16px;border:1px solid #d3d1c7;border-radius:8px;background:#fff;color:#1a1a18;cursor:pointer}
-  button:hover{background:#f1efe8}
-  button:disabled{opacity:.5;cursor:not-allowed}
-  .card{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:10px}
-  .s-title{font-size:11px;font-weight:500;color:#64748b;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
-  .lbl{font-size:12px;color:#64748b;margin-bottom:3px}
-  .val{font-size:15px;font-weight:500;color:#1a1a18}
-  .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
-  .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
-  .badge{display:inline-block;padding:3px 9px;border-radius:8px;font-size:12px;font-weight:500}
-  .bg{background:#dcfce7;color:#166534}
-  .br{background:#fee2e2;color:#991b1b}
-  .bw{background:#fef3c7;color:#92400e}
-  .bi{background:#dbeafe;color:#1e40af}
-  .bn{background:#f1f5f9;color:#475569}
-  .frow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1efe8}
-  .frow:last-child{border-bottom:none}
-  .sig{text-align:center;padding:1.25rem;border-radius:12px;margin-bottom:10px}
-  .sig-long{background:#dcfce7}
-  .sig-short{background:#fee2e2}
-  .sig-none{background:#f1f5f9}
-  .sig-long .sv{color:#166534}
-  .sig-short .sv{color:#991b1b}
-  .sig-none .sv{color:#475569}
-  .sv{font-size:22px;font-weight:500}
-  .mono{font-family:'Menlo','Monaco','Courier New',monospace;font-size:12px}
-  .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  #st{font-size:13px;color:#64748b;min-height:18px;margin-bottom:8px}
-  .sz-box{padding:10px;background:#f1f5f9;border-radius:8px;font-size:13px;line-height:1.6}
-  #timer-bar{background:#fff;color:#5f5e5a}
-  @media(prefers-color-scheme:dark){
-    body{background:#0f172a;color:#f8fafc}
-    .card{background:#1e293b;border-color:#334155}
-    input[type=text]{background:#2c2c2a;color:#e8e6df;border-color:#444441}
-    input[type=text]:focus{border-color:#888780}
-    button{background:#2c2c2a;color:#e8e6df;border-color:#444441}
-    button:hover{background:#3a3a38}
-    .lbl{color:#94a3b8}
-    .val{color:#f8fafc}
-    .frow{border-color:#3a3a38}
-    .s-title{color:#94a3b8}
-    .bg{background:#064e3b;color:#34d399}
-    .br{background:#7f1d1d;color:#f87171}
-    .bw{background:#78350f;color:#fbbf24}
-    .bi{background:#1e3a8a;color:#60a5fa}
-    .bn{background:#334155;color:#cbd5e1}
-    .sig-long{background:#064e3b}
-    .sig-short{background:#7f1d1d}
-    .sig-none{background:#334155}
-    .sig-long .sv{color:#34d399}
-    .sig-short .sv{color:#f87171}
-    .sig-none .sv{color:#cbd5e1}
-    .sz-box{background:#334155}
-    #st{color:#94a3b8}
-    #timer-bar{background:#2c2c2a;border-color:#444441;color:#b4b2a9}
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fibonacci Swing Analyzer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 1.5rem;
+      max-width: 720px;
+      margin: 0 auto
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 4px
+    }
+
+    .sub {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 1.25rem
+    }
+
+    input[type=text] {
+      font-size: 14px;
+      padding: 8px 12px;
+      border: 1px solid #d3d1c7;
+      border-radius: 8px;
+      background: #fff;
+      color: #1a1a18;
+      width: 220px;
+      outline: none
+    }
+
+    input[type=text]:focus {
+      border-color: #888780
+    }
+
+    button {
+      font-size: 13px;
+      padding: 8px 16px;
+      border: 1px solid #d3d1c7;
+      border-radius: 8px;
+      background: #fff;
+      color: #1a1a18;
+      cursor: pointer
+    }
+
+    button:hover {
+      background: #f1efe8
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 10px
+    }
+
+    .s-title {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 8px
+    }
+
+    .lbl {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 3px
+    }
+
+    .val {
+      font-size: 15px;
+      font-weight: 500;
+      color: #1a1a18
+    }
+
+    .g2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px
+    }
+
+    .g3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500
+    }
+
+    .bg {
+      background: #dcfce7;
+      color: #166534
+    }
+
+    .br {
+      background: #fee2e2;
+      color: #991b1b
+    }
+
+    .bw {
+      background: #fef3c7;
+      color: #92400e
+    }
+
+    .bi {
+      background: #dbeafe;
+      color: #1e40af
+    }
+
+    .bn {
+      background: #f1f5f9;
+      color: #475569
+    }
+
+    .frow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f1efe8
+    }
+
+    .frow:last-child {
+      border-bottom: none
+    }
+
+    .sig {
+      text-align: center;
+      padding: 1.25rem;
+      border-radius: 12px;
+      margin-bottom: 10px
+    }
+
+    .sig-long {
+      background: #dcfce7
+    }
+
+    .sig-short {
+      background: #fee2e2
+    }
+
+    .sig-none {
+      background: #f1f5f9
+    }
+
+    .sig-long .sv {
+      color: #166534
+    }
+
+    .sig-short .sv {
+      color: #991b1b
+    }
+
+    .sig-none .sv {
+      color: #475569
+    }
+
+    .sv {
+      font-size: 22px;
+      font-weight: 500
+    }
+
+    .mono {
+      font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 12px
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px
+    }
+
+    #st {
+      font-size: 13px;
+      color: #64748b;
+      min-height: 18px;
+      margin-bottom: 8px
+    }
+
+    .sz-box {
+      padding: 10px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.6
+    }
+
+    #timer-bar {
+      background: #fff;
+      color: #5f5e5a
+    }
+
+    @media(prefers-color-scheme:dark) {
+      body {
+        background: #0f172a;
+        color: #f8fafc
+      }
+
+      .card {
+        background: #1e293b;
+        border-color: #334155
+      }
+
+      input[type=text] {
+        background: #2c2c2a;
+        color: #e8e6df;
+        border-color: #444441
+      }
+
+      input[type=text]:focus {
+        border-color: #888780
+      }
+
+      button {
+        background: #2c2c2a;
+        color: #e8e6df;
+        border-color: #444441
+      }
+
+      button:hover {
+        background: #3a3a38
+      }
+
+      .lbl {
+        color: #94a3b8
+      }
+
+      .val {
+        color: #f8fafc
+      }
+
+      .frow {
+        border-color: #3a3a38
+      }
+
+      .s-title {
+        color: #94a3b8
+      }
+
+      .bg {
+        background: #064e3b;
+        color: #34d399
+      }
+
+      .br {
+        background: #7f1d1d;
+        color: #f87171
+      }
+
+      .bw {
+        background: #78350f;
+        color: #fbbf24
+      }
+
+      .bi {
+        background: #1e3a8a;
+        color: #60a5fa
+      }
+
+      .bn {
+        background: #334155;
+        color: #cbd5e1
+      }
+
+      .sig-long {
+        background: #064e3b
+      }
+
+      .sig-short {
+        background: #7f1d1d
+      }
+
+      .sig-none {
+        background: #334155
+      }
+
+      .sig-long .sv {
+        color: #34d399
+      }
+
+      .sig-short .sv {
+        color: #f87171
+      }
+
+      .sig-none .sv {
+        color: #cbd5e1
+      }
+
+      .sz-box {
+        background: #334155
+      }
+
+      #st {
+        color: #94a3b8
+      }
+
+      #timer-bar {
+        background: #2c2c2a;
+        border-color: #444441;
+        color: #b4b2a9
+      }
+    }
+  </style>
 </head>
+
 <body>
-<h1>Fibonacci Swing Analyzer</h1>
-<div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
-<form class="row" onsubmit="event.preventDefault(); run();">
-  <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY" style="text-transform: uppercase;" oninput="this.value = this.value.toUpperCase()"/>
-  <button type="submit" id="btn">Analyze</button>
-</form>
-<div id="st"></div>
-<div id="res"></div>
-<script>
-const TD_KEY='934f233f1c934c92a767bb9e52191d6d';
-const PROXIES=[
-  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
-  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-];
-const YH_HOSTS=['query1.finance.yahoo.com','query2.finance.yahoo.com'];
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  <h1>Fibonacci Swing Analyzer</h1>
+  <div class="sub">Live data · Daily + 1H Heikin Ashi · All Fibonacci parameters · 2-day to 2-week holds</div>
+  <form class="row" onsubmit="event.preventDefault(); run();">
+    <input id="tk" type="text" placeholder="Ticker — e.g. AAPL, TSLA, SPY" style="text-transform: uppercase;"
+      oninput="this.value = this.value.toUpperCase()" />
+    <button type="submit" id="btn">Analyze</button>
+  </form>
+  <div id="st"></div>
+  <div id="res"></div>
+  <script>
+    const TD_KEY = '934f233f1c934c92a767bb9e52191d6d';
+    const PROXIES = [
+      u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+      u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    ];
+    const YH_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchTD(ticker,interval,outputsize){
-  const ivMap={'1d':'1day','1h':'1h'};
-  const url=`https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${ivMap[interval]}&outputsize=${outputsize}&apikey=${TD_KEY}`;
-  const r=await fetch(url,{headers:{'Accept':'application/json'}});
-  const d=await r.json();
-  if(d.status==='error')throw new Error('Twelve Data: '+d.message);
-  if(!d.values||!d.values.length)throw new Error('Twelve Data: no values returned');
-  return d.values.slice().reverse().map(v=>({
-    date:new Date(v.datetime),
-    o:parseFloat(v.open),h:parseFloat(v.high),
-    l:parseFloat(v.low),c:parseFloat(v.close),
-    v:parseInt(v.volume)||0
-  })).filter(b=>!isNaN(b.c));
-}
-
-async function tryYH(url){
-  const t=(await(await fetch(url,{headers:{'Accept':'application/json'}})).text()).trim();
-  if(!t.startsWith('{')&&!t.startsWith('['))throw new Error('Non-JSON: '+t.slice(0,60));
-  const d=JSON.parse(t);
-  if(d.chart?.error?.description)throw new Error(d.chart.error.description);
-  if(!d.chart?.result?.[0])throw new Error('No data');
-  const res=d.chart.result[0];const q=res.indicators.quote[0];
-  return res.timestamp.map((t,j)=>({
-    date:new Date(t*1000),o:q.open[j],h:q.high[j],l:q.low[j],c:q.close[j],v:q.volume[j]||0
-  })).filter(b=>b.c!=null&&b.h!=null&&b.l!=null&&b.o!=null);
-}
-
-async function fetchBars(ticker,interval,range,stEl){
-  if(stEl)stEl.textContent='Fetching from Twelve Data...';
-  try{
-    const size=interval==='1d'?130:120;
-    return await fetchTD(ticker,interval,size);
-  }catch(e){
-    if(stEl)stEl.textContent='Twelve Data failed, trying fallback...';
-    await sleep(300);
-  }
-  const qs=`/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
-  let attempt=0,lastErr;
-  for(const host of YH_HOSTS){
-    for(const proxy of PROXIES){
-      attempt++;
-      if(stEl)stEl.textContent=`Fallback route ${attempt}/4...`;
-      try{return await tryYH(proxy('https://'+host+qs));}
-      catch(e){lastErr=e;await sleep(400);}
+    async function fetchTD(ticker, interval, outputsize) {
+      const ivMap = { '1d': '1day', '1h': '1h' };
+      const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${ivMap[interval]}&outputsize=${outputsize}&apikey=${TD_KEY}`;
+      const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const d = await r.json();
+      if (d.status === 'error') throw new Error('Twelve Data: ' + d.message);
+      if (!d.values || !d.values.length) throw new Error('Twelve Data: no values returned');
+      return d.values.slice().reverse().map(v => ({
+        date: new Date(v.datetime),
+        o: parseFloat(v.open), h: parseFloat(v.high),
+        l: parseFloat(v.low), c: parseFloat(v.close),
+        v: parseInt(v.volume) || 0
+      })).filter(b => !isNaN(b.c));
     }
-  }
-  throw new Error('All sources failed: '+lastErr.message);
-}
 
-async function fetchVIX() {
-  const PROXY_URL = 'https://vix-proxy.onrender.com//vix';
-  const r = await fetch(PROXY_URL, { signal: AbortSignal.timeout(10000) });
-  if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
-  const j = await r.json();
-  const price = j.price;
-  const prev = j.previousClose;
-  return { price, pct: prev ? (price - prev) / prev * 100 : null };
-}
-
-async function fetchMacro(stEl){
-  if(stEl)stEl.textContent='Fetching macro data...';
-  const B='https://api.twelvedata.com';
-  async function px(sym){const r=await fetch(B+'/price?symbol='+sym+'&apikey='+TD_KEY);const d=await r.json();if(!d.price)throw new Error(sym);return parseFloat(d.price);}
-  async function em(sym,n){const r=await fetch(B+'/ema?symbol='+sym+'&interval=1day&time_period='+n+'&outputsize=1&apikey='+TD_KEY);const d=await r.json();if(!d.values||!d.values[0])throw new Error(sym+' ema');return parseFloat(d.values[0].ema);}
-  let sp=null,se=null,qp=null,qe=null,vix=null;
-  try{[sp,se]=await Promise.all([px('SPY'),em('SPY',21)]);}catch(e){}
-  try{[qp,qe]=await Promise.all([px('QQQ'),em('QQQ',21)]);}catch(e){}
-  try{const v=await fetchVIX();vix=v.price;}catch(e){}
-  return{spyPrice:sp,spyEMA:se,qqqPrice:qp,qqqEMA:qe,vix};
-}
-
-function ema(a,n){const k=2/(n+1),o=new Array(a.length).fill(null);let f=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(f<0){o[i]=a[i];f=i;continue;}if(o[i-1]!=null)o[i]=a[i]*k+o[i-1]*(1-k);}return o;}
-function sma(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){let s=0;for(let j=i-n+1;j<=i;j++)s+=a[j];o[i]=s/n;}return o;}
-function wilder(a,n){const o=new Array(a.length).fill(null);let s=0,st=-1;for(let i=0;i<a.length;i++){if(a[i]==null)continue;if(st<0)st=i;const idx=i-st;if(idx<n)s+=a[i];if(idx===n-1)o[i]=s/n;else if(idx>=n&&o[i-1]!=null)o[i]=(o[i-1]*(n-1)+a[i])/n;}return o;}
-function rStd(a,n){const o=new Array(a.length).fill(null);for(let i=n-1;i<a.length;i++){const sl=a.slice(i-n+1,i+1).filter(x=>x!=null);if(sl.length<n)continue;const m=sl.reduce((a,b)=>a+b,0)/sl.length;o[i]=Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/sl.length);}return o;}
-function ha(bars){const r=[];for(let i=0;i<bars.length;i++){const b=bars[i];const hc=(b.o+b.h+b.l+b.c)/4;const ho=i===0?(b.o+b.c)/2:(r[i-1].ho+r[i-1].hc)/2;r.push({...b,ho,hh:Math.max(b.h,ho,hc),hl:Math.min(b.l,ho,hc),hc});}return r;}
-function atr(bars,n){const tr=bars.map((b,i)=>{if(i===0)return b.h-b.l;const p=bars[i-1].c;return Math.max(b.h-b.l,Math.abs(b.h-p),Math.abs(b.l-p));});return wilder(tr,n);}
-function mfi(bars,n){const o=new Array(bars.length).fill(null);for(let i=n;i<bars.length;i++){let pf=0,nf=0;for(let j=i-n+1;j<=i;j++){const tp=(bars[j].h+bars[j].l+bars[j].c)/3,pt=(bars[j-1].h+bars[j-1].l+bars[j-1].c)/3;const rmf=tp*bars[j].v;if(tp>=pt)pf+=rmf;else nf+=rmf;}o[i]=nf===0?100:100-100/(1+pf/nf);}return o;}
-function obv(bars){const o=new Array(bars.length).fill(0);for(let i=1;i<bars.length;i++){if(bars[i].c>bars[i-1].c)o[i]=o[i-1]+bars[i].v;else if(bars[i].c<bars[i-1].c)o[i]=o[i-1]-bars[i].v;else o[i]=o[i-1];}return o;}
-function efi(bars,en,sn){const raw=bars.map((b,i)=>i===0?0:(b.c-bars[i-1].c)*b.v);const e=ema(raw,en);const mu=sma(e,sn);const sig=rStd(e,sn);return{e,mu,sig};}
-function rsi(closes,n){const g=[],l=[];for(let i=1;i<closes.length;i++){const d=closes[i]-closes[i-1];g.push(Math.max(d,0));l.push(Math.max(-d,0));}const ag=wilder(g,n),al=wilder(l,n);const o=[null];for(let i=0;i<ag.length;i++){if(ag[i]==null){o.push(null);continue;}o.push(al[i]===0?100:100-100/(1+ag[i]/al[i]));}return o;}
-function macd(closes,f,s,sg){const ef=ema(closes,f),es=ema(closes,s);const ml=closes.map((_,i)=>ef[i]!=null&&es[i]!=null?ef[i]-es[i]:null);const sl=ema(ml,sg);const h=ml.map((v,i)=>v!=null&&sl[i]!=null?v-sl[i]:null);return{ml,sl,h};}
-function bbw(closes,n){const m=sma(closes,n);const o=new Array(closes.length).fill(null);for(let i=n-1;i<closes.length;i++){const sl=closes.slice(i-n+1,i+1);const mn=m[i];const sd=Math.sqrt(sl.reduce((a,b)=>a+(b-mn)**2,0)/n);if(mn!==0)o[i]=(4*sd)/mn;}return o;}
-function adx(bars,n){const tr=[],pdm=[],ndm=[];for(let i=1;i<bars.length;i++){const h=bars[i].h,l=bars[i].l,ph=bars[i-1].h,pl=bars[i-1].l,pc=bars[i-1].c;tr.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));const up=h-ph,dn=pl-l;pdm.push(up>dn&&up>0?up:0);ndm.push(dn>up&&dn>0?dn:0);}const atr=wilder(tr,n),ap=wilder(pdm,n),an=wilder(ndm,n);const o=new Array(bars.length).fill(null);const dx=[];for(let i=0;i<atr.length;i++){if(atr[i]==null||atr[i]===0){dx.push(null);continue;}const pi=100*ap[i]/atr[i],ni=100*an[i]/atr[i];const d=pi+ni===0?null:100*Math.abs(pi-ni)/(pi+ni);dx.push(d);}const adxArr=wilder(dx,n);for(let i=0;i<adxArr.length;i++)o[i+1]=adxArr[i];return o;}
-/* ══════════════════════════════════════════
-   SMC ENGINE (Smart Money Concepts)
-══════════════════════════════════════════ */
-function getSMC(bars) {
-  const n = bars.length;
-  if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none' };
-
-  const swings = [];
-  const win = 3;
-  for (let i = win; i < n - win; i++) {
-    let isHigh = true, isLow = true;
-    for (let j = i - win; j <= i + win; j++) {
-      if (j === i) continue;
-      if (bars[j].h > bars[i].h) isHigh = false;
-      if (bars[j].l < bars[i].l) isLow = false;
+    async function tryYH(url) {
+      const t = (await (await fetch(url, { headers: { 'Accept': 'application/json' } })).text()).trim();
+      if (!t.startsWith('{') && !t.startsWith('[')) throw new Error('Non-JSON: ' + t.slice(0, 60));
+      const d = JSON.parse(t);
+      if (d.chart?.error?.description) throw new Error(d.chart.error.description);
+      if (!d.chart?.result?.[0]) throw new Error('No data');
+      const res = d.chart.result[0]; const q = res.indicators.quote[0];
+      return res.timestamp.map((t, j) => ({
+        date: new Date(t * 1000), o: q.open[j], h: q.high[j], l: q.low[j], c: q.close[j], v: q.volume[j] || 0
+      })).filter(b => b.c != null && b.h != null && b.l != null && b.o != null);
     }
-    if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
-    if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
-  }
 
-  let structure = 'neutral', lastEvent = 'none', lastS = null;
-  let highRef = swings.filter(s => s.type === 'high').pop()?.val;
-  let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
-
-  for (let i = 0; i < n; i++) {
-    const c = bars[i].c;
-    if (highRef && c > highRef) {
-      const isChoCH = structure === 'bearish';
-      structure = 'bullish';
-      lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-      lastS = i;
-      highRef = Math.max(...bars.slice(i).map(b => b.h));
-    } else if (lowRef && c < lowRef) {
-      const isChoCH = structure === 'bullish';
-      structure = 'bearish';
-      lastEvent = isChoCH ? 'CHoCH' : 'BOS';
-      lastS = i;
-      lowRef = Math.min(...bars.slice(i).map(b => b.l));
-    }
-  }
-
-  const fvgs = [];
-  for (let i = 1; i < n - 1; i++) {
-    if (bars[i-1].h < bars[i+1].l) fvgs.push({ type: 'bull', top: bars[i+1].l, bot: bars[i-1].h });
-    if (bars[i-1].l > bars[i+1].h) fvgs.push({ type: 'bear', top: bars[i-1].l, bot: bars[i+1].h });
-  }
-
-  const obs = [];
-  if (lastS !== null) {
-    const start = Math.max(0, lastS - 5);
-    for (let i = start; i < lastS; i++) {
-      if (structure === 'bullish' && bars[i].c < bars[i].o) {
-        obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
-        break;
+    async function fetchBars(ticker, interval, range, stEl) {
+      if (stEl) stEl.textContent = 'Fetching from Twelve Data...';
+      try {
+        const size = interval === '1d' ? 130 : 120;
+        return await fetchTD(ticker, interval, size);
+      } catch (e) {
+        if (stEl) stEl.textContent = 'Twelve Data failed, trying fallback...';
+        await sleep(300);
       }
-      if (structure === 'bearish' && bars[i].c > bars[i].o) {
-        obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
-        break;
+      const qs = `/v8/finance/chart/${ticker}?interval=${interval}&range=${range}&includePrePost=false`;
+      let attempt = 0, lastErr;
+      for (const host of YH_HOSTS) {
+        for (const proxy of PROXIES) {
+          attempt++;
+          if (stEl) stEl.textContent = `Fallback route ${attempt}/4...`;
+          try { return await tryYH(proxy('https://' + host + qs)); }
+          catch (e) { lastErr = e; await sleep(400); }
+        }
+      }
+      throw new Error('All sources failed: ' + lastErr.message);
+    }
+
+    async function fetchVIX() {
+      const PROXY_URL = 'https://vix-proxy.onrender.com//vix';
+      const r = await fetch(PROXY_URL, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
+      const j = await r.json();
+      const price = j.price;
+      const prev = j.previousClose;
+      return { price, pct: prev ? (price - prev) / prev * 100 : null };
+    }
+
+    async function fetchMacro(stEl) {
+      if (stEl) stEl.textContent = 'Fetching macro data...';
+      const B = 'https://api.twelvedata.com';
+      async function px(sym) { const r = await fetch(B + '/price?symbol=' + sym + '&apikey=' + TD_KEY); const d = await r.json(); if (!d.price) throw new Error(sym); return parseFloat(d.price); }
+      async function em(sym, n) { const r = await fetch(B + '/ema?symbol=' + sym + '&interval=1day&time_period=' + n + '&outputsize=1&apikey=' + TD_KEY); const d = await r.json(); if (!d.values || !d.values[0]) throw new Error(sym + ' ema'); return parseFloat(d.values[0].ema); }
+      let sp = null, se = null, qp = null, qe = null, vix = null;
+      try { [sp, se] = await Promise.all([px('SPY'), em('SPY', 21)]); } catch (e) { }
+      try { [qp, qe] = await Promise.all([px('QQQ'), em('QQQ', 21)]); } catch (e) { }
+      try { const v = await fetchVIX(); vix = v.price; } catch (e) { }
+      return { spyPrice: sp, spyEMA: se, qqqPrice: qp, qqqEMA: qe, vix };
+    }
+
+    function ema(a, n) { const k = 2 / (n + 1), o = new Array(a.length).fill(null); let f = -1; for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; if (f < 0) { o[i] = a[i]; f = i; continue; } if (o[i - 1] != null) o[i] = a[i] * k + o[i - 1] * (1 - k); } return o; }
+    function sma(a, n) { const o = new Array(a.length).fill(null); for (let i = n - 1; i < a.length; i++) { let s = 0; for (let j = i - n + 1; j <= i; j++)s += a[j]; o[i] = s / n; } return o; }
+    function wilder(a, n) { const o = new Array(a.length).fill(null); let s = 0, st = -1; for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; if (st < 0) st = i; const idx = i - st; if (idx < n) s += a[i]; if (idx === n - 1) o[i] = s / n; else if (idx >= n && o[i - 1] != null) o[i] = (o[i - 1] * (n - 1) + a[i]) / n; } return o; }
+    function rStd(a, n) { const o = new Array(a.length).fill(null); for (let i = n - 1; i < a.length; i++) { const sl = a.slice(i - n + 1, i + 1).filter(x => x != null); if (sl.length < n) continue; const m = sl.reduce((a, b) => a + b, 0) / sl.length; o[i] = Math.sqrt(sl.reduce((a, b) => a + (b - m) ** 2, 0) / sl.length); } return o; }
+    function ha(bars) { const r = []; for (let i = 0; i < bars.length; i++) { const b = bars[i]; const hc = (b.o + b.h + b.l + b.c) / 4; const ho = i === 0 ? (b.o + b.c) / 2 : (r[i - 1].ho + r[i - 1].hc) / 2; r.push({ ...b, ho, hh: Math.max(b.h, ho, hc), hl: Math.min(b.l, ho, hc), hc }); } return r; }
+    function atr(bars, n) { const tr = bars.map((b, i) => { if (i === 0) return b.h - b.l; const p = bars[i - 1].c; return Math.max(b.h - b.l, Math.abs(b.h - p), Math.abs(b.l - p)); }); return wilder(tr, n); }
+    function mfi(bars, n) { const o = new Array(bars.length).fill(null); for (let i = n; i < bars.length; i++) { let pf = 0, nf = 0; for (let j = i - n + 1; j <= i; j++) { const tp = (bars[j].h + bars[j].l + bars[j].c) / 3, pt = (bars[j - 1].h + bars[j - 1].l + bars[j - 1].c) / 3; const rmf = tp * bars[j].v; if (tp >= pt) pf += rmf; else nf += rmf; } o[i] = nf === 0 ? 100 : 100 - 100 / (1 + pf / nf); } return o; }
+    function obv(bars) { const o = new Array(bars.length).fill(0); for (let i = 1; i < bars.length; i++) { if (bars[i].c > bars[i - 1].c) o[i] = o[i - 1] + bars[i].v; else if (bars[i].c < bars[i - 1].c) o[i] = o[i - 1] - bars[i].v; else o[i] = o[i - 1]; } return o; }
+    function efi(bars, en, sn) { const raw = bars.map((b, i) => i === 0 ? 0 : (b.c - bars[i - 1].c) * b.v); const e = ema(raw, en); const mu = sma(e, sn); const sig = rStd(e, sn); return { e, mu, sig }; }
+    function rsi(closes, n) { const g = [], l = []; for (let i = 1; i < closes.length; i++) { const d = closes[i] - closes[i - 1]; g.push(Math.max(d, 0)); l.push(Math.max(-d, 0)); } const ag = wilder(g, n), al = wilder(l, n); const o = [null]; for (let i = 0; i < ag.length; i++) { if (ag[i] == null) { o.push(null); continue; } o.push(al[i] === 0 ? 100 : 100 - 100 / (1 + ag[i] / al[i])); } return o; }
+    function macd(closes, f, s, sg) { const ef = ema(closes, f), es = ema(closes, s); const ml = closes.map((_, i) => ef[i] != null && es[i] != null ? ef[i] - es[i] : null); const sl = ema(ml, sg); const h = ml.map((v, i) => v != null && sl[i] != null ? v - sl[i] : null); return { ml, sl, h }; }
+    function bbw(closes, n) { const m = sma(closes, n); const o = new Array(closes.length).fill(null); for (let i = n - 1; i < closes.length; i++) { const sl = closes.slice(i - n + 1, i + 1); const mn = m[i]; const sd = Math.sqrt(sl.reduce((a, b) => a + (b - mn) ** 2, 0) / n); if (mn !== 0) o[i] = (4 * sd) / mn; } return o; }
+    function adx(bars, n) { const tr = [], pdm = [], ndm = []; for (let i = 1; i < bars.length; i++) { const h = bars[i].h, l = bars[i].l, ph = bars[i - 1].h, pl = bars[i - 1].l, pc = bars[i - 1].c; tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc))); const up = h - ph, dn = pl - l; pdm.push(up > dn && up > 0 ? up : 0); ndm.push(dn > up && dn > 0 ? dn : 0); } const atr = wilder(tr, n), ap = wilder(pdm, n), an = wilder(ndm, n); const o = new Array(bars.length).fill(null); const dx = []; for (let i = 0; i < atr.length; i++) { if (atr[i] == null || atr[i] === 0) { dx.push(null); continue; } const pi = 100 * ap[i] / atr[i], ni = 100 * an[i] / atr[i]; const d = pi + ni === 0 ? null : 100 * Math.abs(pi - ni) / (pi + ni); dx.push(d); } const adxArr = wilder(dx, n); for (let i = 0; i < adxArr.length; i++)o[i + 1] = adxArr[i]; return o; }
+    function getSMC(bars) {
+      const n = bars.length;
+      if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
+
+      const swings = [];
+      const win = 3;
+      for (let i = win; i < n - win; i++) {
+        let isHigh = true, isLow = true;
+        for (let j = i - win; j <= i + win; j++) {
+          if (j === i) continue;
+          if (bars[j].h > bars[i].h) isHigh = false;
+          if (bars[j].l < bars[i].l) isLow = false;
+        }
+        if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
+        if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
+      }
+
+      let structure = 'neutral', lastEvent = 'none', lastS = null;
+      let highRef = swings.filter(s => s.type === 'high').pop()?.val;
+      let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
+
+      for (let i = 0; i < n; i++) {
+        const c = bars[i].c;
+        if (highRef && c > highRef) {
+          const isChoCH = structure === 'bearish';
+          structure = 'bullish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          highRef = Math.max(...bars.slice(i).map(b => b.h));
+        } else if (lowRef && c < lowRef) {
+          const isChoCH = structure === 'bullish';
+          structure = 'bearish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          lowRef = Math.min(...bars.slice(i).map(b => b.l));
+        }
+      }
+
+      const fvgs = [];
+      for (let i = 1; i < n - 1; i++) {
+        if (bars[i - 1].h < bars[i + 1].l) fvgs.push({ type: 'bull', top: bars[i + 1].l, bot: bars[i - 1].h });
+        if (bars[i - 1].l > bars[i + 1].h) fvgs.push({ type: 'bear', top: bars[i - 1].l, bot: bars[i + 1].h });
+      }
+
+      const obs = [];
+      if (lastS !== null) {
+        const start = Math.max(0, lastS - 5);
+        for (let i = start; i < lastS; i++) {
+          if (structure === 'bullish' && bars[i].c < bars[i].o) {
+            obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+          if (structure === 'bearish' && bars[i].c > bars[i].o) {
+            obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+        }
+      }
+
+      const curP = bars[n - 1].c;
+      let poi = 'none';
+      let breakdown = { structure: 0, ob: 0, fvg: 0 };
+
+      if (structure === 'bullish') {
+        breakdown.structure = 1;
+        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
+        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
+      } else if (structure === 'bearish') {
+        breakdown.structure = -1;
+        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
+        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
+      }
+
+      return { structure, lastEvent, poi, breakdown };
+    }
+
+    function getSMC(bars) {
+      const n = bars.length;
+      if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
+
+      const swings = [];
+      const win = 3;
+      for (let i = win; i < n - win; i++) {
+        let isHigh = true, isLow = true;
+        for (let j = i - win; j <= i + win; j++) {
+          if (j === i) continue;
+          if (bars[j].h > bars[i].h) isHigh = false;
+          if (bars[j].l < bars[i].l) isLow = false;
+        }
+        if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
+        if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
+      }
+
+      let structure = 'neutral', lastEvent = 'none', lastS = null;
+      let highRef = swings.filter(s => s.type === 'high').pop()?.val;
+      let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
+
+      for (let i = 0; i < n; i++) {
+        const c = bars[i].c;
+        if (highRef && c > highRef) {
+          const isChoCH = structure === 'bearish';
+          structure = 'bullish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          highRef = Math.max(...bars.slice(i).map(b => b.h));
+        } else if (lowRef && c < lowRef) {
+          const isChoCH = structure === 'bullish';
+          structure = 'bearish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          lowRef = Math.min(...bars.slice(i).map(b => b.l));
+        }
+      }
+
+      const fvgs = [];
+      for (let i = 1; i < n - 1; i++) {
+        if (bars[i - 1].h < bars[i + 1].l) fvgs.push({ type: 'bull', top: bars[i + 1].l, bot: bars[i - 1].h });
+        if (bars[i - 1].l > bars[i + 1].h) fvgs.push({ type: 'bear', top: bars[i - 1].l, bot: bars[i + 1].h });
+      }
+
+      const obs = [];
+      if (lastS !== null) {
+        const start = Math.max(0, lastS - 5);
+        for (let i = start; i < lastS; i++) {
+          if (structure === 'bullish' && bars[i].c < bars[i].o) {
+            obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+          if (structure === 'bearish' && bars[i].c > bars[i].o) {
+            obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+        }
+      }
+
+      const curP = bars[n - 1].c;
+      let poi = 'none';
+      let breakdown = { structure: 0, ob: 0, fvg: 0 };
+
+      if (structure === 'bullish') {
+        breakdown.structure = 1;
+        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
+        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
+      } else if (structure === 'bearish') {
+        breakdown.structure = -1;
+        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
+        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
+      }
+
+      return { structure, lastEvent, poi, breakdown };
+    }
+
+    function getSMC(bars) {
+      const n = bars.length;
+      if (n < 20) return { structure: 'neutral', lastEvent: 'none', poi: 'none', breakdown: { structure: 0, ob: 0, fvg: 0 } };
+
+      const swings = [];
+      const win = 3;
+      for (let i = win; i < n - win; i++) {
+        let isHigh = true, isLow = true;
+        for (let j = i - win; j <= i + win; j++) {
+          if (j === i) continue;
+          if (bars[j].h > bars[i].h) isHigh = false;
+          if (bars[j].l < bars[i].l) isLow = false;
+        }
+        if (isHigh) swings.push({ type: 'high', i, val: bars[i].h });
+        if (isLow) swings.push({ type: 'low', i, val: bars[i].l });
+      }
+
+      let structure = 'neutral', lastEvent = 'none', lastS = null;
+      let highRef = swings.filter(s => s.type === 'high').pop()?.val;
+      let lowRef = swings.filter(s => s.type === 'low').pop()?.val;
+
+      for (let i = 0; i < n; i++) {
+        const c = bars[i].c;
+        if (highRef && c > highRef) {
+          const isChoCH = structure === 'bearish';
+          structure = 'bullish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          highRef = Math.max(...bars.slice(i).map(b => b.h));
+        } else if (lowRef && c < lowRef) {
+          const isChoCH = structure === 'bullish';
+          structure = 'bearish';
+          lastEvent = isChoCH ? 'CHoCH' : 'BOS';
+          lastS = i;
+          lowRef = Math.min(...bars.slice(i).map(b => b.l));
+        }
+      }
+
+      const fvgs = [];
+      for (let i = 1; i < n - 1; i++) {
+        if (bars[i - 1].h < bars[i + 1].l) fvgs.push({ type: 'bull', top: bars[i + 1].l, bot: bars[i - 1].h });
+        if (bars[i - 1].l > bars[i + 1].h) fvgs.push({ type: 'bear', top: bars[i - 1].l, bot: bars[i + 1].h });
+      }
+
+      const obs = [];
+      if (lastS !== null) {
+        const start = Math.max(0, lastS - 5);
+        for (let i = start; i < lastS; i++) {
+          if (structure === 'bullish' && bars[i].c < bars[i].o) {
+            obs.push({ type: 'bull', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+          if (structure === 'bearish' && bars[i].c > bars[i].o) {
+            obs.push({ type: 'bear', top: bars[i].h, bot: bars[i].l });
+            break;
+          }
+        }
+      }
+
+      const curP = bars[n - 1].c;
+      let poi = 'none';
+      let breakdown = { structure: 0, ob: 0, fvg: 0 };
+
+      if (structure === 'bullish') {
+        breakdown.structure = 1;
+        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
+        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
+      } else if (structure === 'bearish') {
+        breakdown.structure = -1;
+        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
+        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
+      }
+
+      return { structure, lastEvent, poi, breakdown };
+    }
+
+    function analyze(dBars, hBars, ticker, macro) {
+
+
+
+      const n = dBars.length, L = n - 1;
+      const closes = dBars.map(b => b.c);
+      const haD = ha(dBars);
+      const a5 = atr(dBars, 5), a13 = atr(dBars, 13);
+      const m13 = mfi(dBars, 13);
+      const ob = obv(dBars);
+      const { e: efiV, mu: efiMu, sig: efiSig } = efi(dBars, 13, 34);
+      const r8 = rsi(closes, 8);
+      const { h: mH } = macd(closes, 13, 21, 8);
+      const bw = bbw(closes, 21);
+      const adxV = adx(dBars, 13);
+      const obvSlope = ob[L] > ob[L - 3] ? 'rising' : ob[L] < ob[L - 3] ? 'falling' : 'flat';
+      const curBBW = bw[L], prvBBW = bw[L - 1];
+      const bbwExp = curBBW != null && prvBBW != null && curBBW > prvBBW;
+      const bbw21Max = Math.max(...bw.slice(Math.max(0, L - 21), L).filter(x => x != null));
+      const curAr = adxV[L], curEFI = efiV[L], curMu = efiMu[L], curSig = efiSig[L];
+      const curMFI = m13[L], curRSI = r8[L];
+      const curH = mH[L], prvH = mH[L - 1];
+      const histRising = curH != null && prvH != null && curH > prvH;
+      let regime, regAct, regMult = 1.0;
+      if (curBBW != null && curBBW > bbw21Max) { regime = 'Volatile'; regAct = 'Reduce to 0.191 Kelly'; regMult = 0.382; }
+      else if (curAr != null && curAr > 25) { regime = 'Trending'; regAct = 'Momentum bias — follow HA'; regMult = 1.0; }
+      else if (curAr != null && curAr < 20 && !bbwExp) { regime = 'Mean-reverting'; regAct = 'Fade extremes'; regMult = 0.618; }
+      else { regime = 'Transition'; regAct = 'Reduce to 0.618, no fade'; regMult = 0.618; }
+      let flow = 'CLEAN';
+      if (curEFI != null && curMu != null && curSig != null) {
+        if (curEFI > curMu + 2 * curSig) flow = 'TOXIC BUY';
+        else if (curEFI < curMu - 2 * curSig) flow = 'TOXIC SELL';
+      }
+      let hHA = 'n/a', hRSI = null, hOBV = 'n/a', hEFIDir = 'n/a', flowMixed = false;
+      if (hBars && hBars.length > 20) {
+        const hN = hBars.length - 1;
+        const haH = ha(hBars);
+        hHA = haH[hN].hc >= haH[hN].ho ? 'bullish' : 'bearish';
+        const hR = rsi(hBars.map(b => b.c), 8);
+        hRSI = hR[hN];
+        const hO = obv(hBars);
+        hOBV = hO[hN] > hO[hN - 3] ? 'rising' : hO[hN] < hO[hN - 3] ? 'falling' : 'flat';
+        const hSigN = Math.min(55, hBars.length - 14);
+        if (hSigN > 5) {
+          const { e: hEFIV } = efi(hBars, 13, hSigN);
+          const hEC = hEFIV[hN], hEP = hEFIV[hN - 1];
+          if (hEC != null && hEP != null) hEFIDir = hEC > hEP ? 'rising' : 'falling';
+        }
+        const dEFIPrev = efiV[L - 1];
+        const dEFIDir = curEFI != null && dEFIPrev != null ? (curEFI > dEFIPrev ? 'rising' : 'falling') : null;
+        if (dEFIDir && hEFIDir !== 'n/a' && dEFIDir !== hEFIDir) flowMixed = true;
+      }
+      let f1 = 0, f1r = '', f2 = 0, f2r = '', f3 = 0, f3r = '', f4 = 0, f4r = '', f5 = 0, f5r = '';
+      if (curMFI != null) { if (curMFI > 55 && obvSlope === 'rising') { f1 = 1; f1r = 'MFI ' + curMFI.toFixed(1) + ' >55 + OBV rising'; } else if (curMFI < 45 && obvSlope === 'falling') { f1 = -1; f1r = 'MFI ' + curMFI.toFixed(1) + ' <45 + OBV falling'; } else { f1r = 'MFI ' + curMFI.toFixed(1) + ', OBV ' + obvSlope; } }
+      if (curH != null) { if (curH > 0 && histRising) { f2 = 1; f2r = 'Hist +' + curH.toFixed(4) + ' rising'; } else if (curH < 0 && !histRising) { f2 = -1; f2r = 'Hist ' + curH.toFixed(4) + ' falling'; } else { f2r = 'Hist ' + curH.toFixed(4) + ' mixed'; } }
+      if (curRSI != null) { if (curRSI > 55) { f3 = 1; f3r = 'RSI ' + curRSI.toFixed(1) + ' >55'; } else if (curRSI < 45) { f3 = -1; f3r = 'RSI ' + curRSI.toFixed(1) + ' <45'; } else { f3r = 'RSI ' + curRSI.toFixed(1) + ' neutral'; } }
+
+      // f4: EFI Momentum (Acceleration)
+      if (efiV[L] != null && efiV[L - 1] != null) {
+        if (efiV[L] > efiV[L - 1]) { f4 = 1; f4r = 'EFI Force accelerating'; }
+        else if (efiV[L] < efiV[L - 1]) { f4 = -1; f4r = 'EFI Force decelerating'; }
+        else { f4r = 'EFI Force flat'; }
+      } else { f4r = 'EFI n/a'; }
+
+      const avgVol = dBars.slice(Math.max(0, L - 19), L + 1).reduce((a, b) => a + (b.v || 0), 0) / 20;
+      const volRatio = avgVol > 0 ? dBars[L].v / avgVol : 0;
+
+      // f5: Vol Confirmation (VSA: Price direction + Relative Volume)
+      const isBullVol = (dBars[L].c > dBars[L].o) && (volRatio > 1.1);
+      const isBearVol = (dBars[L].c < dBars[L].o) && (volRatio > 1.1);
+      if (isBullVol) { f5 = 1; f5r = 'High Vol Bull Candle'; }
+      else if (isBearVol) { f5 = -1; f5r = 'High Vol Bear Candle'; }
+      else { f5r = 'Vol alignment neutral'; }
+
+      let score = f1 + f2 + f3 + f4 + f5;
+
+      // SMC Score Integration (Max 5 points: structure 1, OB 3, FVG 1)
+      const smc = getSMC(dBars);
+      const smcPoints = smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
+
+      if (score >= 0) score += Math.max(0, smcPoints);
+      else score += Math.min(0, smcPoints);
+
+      if (flowMixed) score = Math.max(-3, Math.min(3, score - 1));
+      const haBar = haD[L];
+      const haBody = haBar ? Math.abs(haBar.hc - haBar.ho) / (haBar.hh - haBar.hl || 0.0001) : 0;
+      const infFlow = haBody > 0.618 && a5[L] != null && Math.abs(dBars[L].c - dBars[L - 1].c) > a5[L];
+      if (infFlow) regMult = Math.min(regMult, 0.618);
+      let signal, sigClass;
+      if (flow !== 'CLEAN') { signal = 'NO TRADE — ' + flow; sigClass = 'sig-none'; }
+      else if (score >= 2) { signal = score === 3 ? 'LONG — full position' : 'LONG — reduced position'; sigClass = 'sig-long'; }
+      else if (score <= -2) { signal = score === -3 ? 'SHORT — full position' : 'SHORT — reduced position'; sigClass = 'sig-short'; }
+      else { signal = 'NO TRADE — wait for alignment'; sigClass = 'sig-none'; }
+      const aligned = (signal.includes('LONG') && hHA === 'bullish') || (signal.includes('SHORT') && hHA === 'bearish');
+      const rsiOK = (signal.includes('LONG') && hRSI != null && hRSI > 55) || (signal.includes('SHORT') && hRSI != null && hRSI < 45);
+      const obvOK = (signal.includes('LONG') && hOBV === 'rising') || (signal.includes('SHORT') && hOBV === 'falling');
+      const entryReady = aligned && rsiOK && obvOK;
+      var macroPass = true, macroReason = '', spyAbove = null, qqqAbove = null, vixOk = null;
+      if (macro) {
+        spyAbove = macro.spyPrice != null && macro.spyEMA != null ? macro.spyPrice > macro.spyEMA : null;
+        qqqAbove = macro.qqqPrice != null && macro.qqqEMA != null ? macro.qqqPrice > macro.qqqEMA : null;
+        var isLong = score >= 2, isShort = score <= -2;
+        if (isLong) {
+          vixOk = macro.vix != null ? macro.vix < 25 : null;
+          var pts = (spyAbove === true ? 1 : 0) + (qqqAbove === true ? 1 : 0) + (vixOk === true ? 1 : 0);
+          if (pts < 2) { macroPass = false; macroReason = 'Macro does not support long'; }
+        } else if (isShort) {
+          vixOk = macro.vix != null ? macro.vix > 20 : null;
+          var pts2 = (spyAbove === false ? 1 : 0) + (qqqAbove === false ? 1 : 0) + (vixOk === true ? 1 : 0);
+          if (pts2 < 2) { macroPass = false; macroReason = 'Macro does not support short'; }
+        } else { vixOk = macro.vix != null ? macro.vix < 25 : null; }
+        if (!macroPass) { signal = 'NO TRADE — macro blocked'; sigClass = 'sig-none'; }
+      }
+
+      const volState = volRatio > 1.5 ? 'High' : volRatio < 0.7 ? 'Low' : 'Normal';
+      const volAnalysis = `${volState} Vol / ${obvSlope} OBV`;
+
+      return {
+        regime, regAct, regMult, curAr, curBBW, bbwExp, flow, flowMixed, curEFI, curMu, curSig,
+        f1, f1r, f2, f2r, f3, f3r, f4, f4r, f5, f5r, score, infFlow, haBody: haBody.toFixed(3),
+        signal, sigClass, a5: a5[L], a13: a13[L], bbwState: bbwExp ? 'expanding' : 'contracting',
+        hHA, hRSI, hOBV, hEFIDir, entryReady, ticker, date: dBars[L].date.toLocaleDateString(),
+        macroPass, macroReason, spyAbove, qqqAbove, vixOk,
+        spyPrice: macro ? macro.spyPrice : null, spyEMA: macro ? macro.spyEMA : null,
+        qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA : null,
+        vix: macro ? macro.vix : null,
+        volAnalysis, smc
+      };
+    }
+    function b(t, c) { return '<span class="badge ' + c + '">' + t + '</span>'; }
+    function fb(s, m = 1) {
+      const v = s + '/' + m;
+      return s === 1 ? b(v, 'bg') : s === -1 ? b(v, 'br') : b(v, 'bn');
+    }
+    function sb(s, m = 10) {
+      const v = s + '/' + m;
+      return s > 0 ? b(v, 'bg') : s < 0 ? b(v, 'br') : b(v, 'bn');
+    }
+    function fmt(v, d) { d = d || 3; return v != null ? Number(v).toFixed(d) : 'n/a'; }
+    function fmtE(v) {
+      if (v == null) return 'n/a';
+      const absV = Math.abs(v);
+      if (absV >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+      if (absV >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+      if (absV >= 1e3) return (v / 1e3).toFixed(2) + 'K';
+      return v.toFixed(2);
+    }
+    function render(r) {
+      const regC = r.regime === 'Trending' ? 'bg' : r.regime === 'Volatile' ? 'br' : r.regime === 'Mean-reverting' ? 'bw' : 'bn';
+      const flowC = r.flow === 'CLEAN' ? 'bg' : r.flow.indexOf('TOXIC') >= 0 ? 'br' : 'bw';
+      const entC = r.entryReady ? 'bg' : r.hHA === 'n/a' ? 'bn' : 'bw';
+      const entTxt = r.entryReady ? 'READY' : r.hHA === 'n/a' ? 'NO 1H DATA' : 'PENDING';
+      const infC = r.infFlow ? 'bw' : 'bg';
+      const sigW = r.curSig != null ? '&plusmn;' + fmtE(2 * r.curSig) : 'n/a';
+      document.getElementById('res').innerHTML =
+        '<div class="card"><div class="s-title">Step 0 &middot; Macro gate</div>' + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.macroPass === false ? 'Macro blocked' : 'Macro pass', r.macroPass === false ? 'br' : 'bg') + (r.macroReason ? '<span style="font-size:12px;color:#a32d2d;margin-left:6px">' + r.macroReason + '</span>' : '') + '</div>' + '<div class="g3">' + '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' + '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' + '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' + '</div></div>' +
+        '<div class="card"><div class="s-title">1 &middot; Regime</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' + b(r.regime, regC) + '<span style="font-size:12px;color:#888780">' + r.regAct + '</span></div>' +
+        '<div class="g3"><div><div class="lbl">ADX(13)</div><div class="val">' + fmt(r.curAr, 1) + '</div></div>' +
+        '<div><div class="lbl">BBW(21)</div><div class="val">' + fmt(r.curBBW, 4) + ' <span style="font-size:11px;color:#888780">' + r.bbwState + '</span></div></div>' +
+        '<div><div class="lbl">Vol Analysis</div><div class="val">' + r.volAnalysis + '</div></div></div></div>' +
+        '<div class="card"><div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
+        '<div class="g3"><div><div class="lbl">EFI(13) current</div><div class="val mono">' + fmtE(r.curEFI) + '</div></div>' +
+        '<div><div class="lbl">55D mean</div><div class="val mono">' + fmtE(r.curMu) + '</div></div>' +
+        '<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">' + sigW + '</div></div></div></div>' +
+        '<div class="card"><div class="s-title">3 &middot; Alpha score</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f1r + '</span>' + fb(r.f1) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f2r + '</span>' + fb(r.f2) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
+        '<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>' : '') + '</div></div>' +
+        '<div class="sig ' + r.sigClass + '"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">' + r.signal + '</div></div>' +
+        '<div class="card"><div class="s-title">4 &middot; Adverse selection</div>' +
+        '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
+        '<div class="g2"><div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>' +
+        '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div></div></div>' +
+        '<div class="card"><div class="s-title">5 &middot; Volatility state</div>' +
+        '<div class="g2"><div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
+        '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div></div>' +
+        '<div style="margin-top:8px;font-size:12px;color:#888780">Switch to static ATR at day 8 of hold</div></div>' +
+        '<div class="card"><div class="s-title">6 &middot; Position size</div>' +
+        '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#888780">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div></div>' +
+        '<div class="card"><div class="s-title">7 &middot; 1H entry timing</div>' +
+        '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
+        '<div class="g2"><div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
+        '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
+        '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
+        '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div></div></div>';
+    }
+    let retryTimer = null, autoTimer = null, countdownTimer = null, autoOn = false;
+    function clearRetry() { if (retryTimer) { clearInterval(retryTimer); retryTimer = null; } }
+    function startRetryCountdown(tk, secs) {
+      var res = document.getElementById('res');
+      var t = secs;
+      res.innerHTML = '<div id="retry-box" style="font-size:13px;padding:.75rem 0;color:#5f5e5a">Rate limited — auto-retrying in <span id="cd">' + t + '</span>s... <button onclick="clearRetry();run()" style="margin-left:8px;font-size:12px;padding:4px 10px">Retry now</button></div>';
+      retryTimer = setInterval(function () {
+        t--; var el = document.getElementById('cd');
+        if (el) el.textContent = t;
+        if (t <= 0) { clearRetry(); run(); }
+      }, 1000);
+    }
+    function updateNextLabel(secsLeft) {
+      var el = document.getElementById('next-lbl');
+      if (!el || !autoOn) { if (el) el.textContent = ''; return; }
+      var m = Math.floor(secsLeft / 60), s = secsLeft % 60;
+      el.textContent = '· next refresh in ' + (m > 0 ? m + 'm ' : '') + s + 's';
+    }
+    function startAutoRefresh() {
+      if (autoTimer) clearInterval(autoTimer);
+      if (countdownTimer) clearInterval(countdownTimer);
+      var mins = parseInt(document.getElementById('interval-sel').value) || 5;
+      var totalSecs = mins * 60, secsLeft = totalSecs;
+      updateNextLabel(secsLeft);
+      countdownTimer = setInterval(function () {
+        secsLeft--;
+        if (secsLeft <= 0) secsLeft = totalSecs;
+        updateNextLabel(secsLeft);
+      }, 1000);
+      autoTimer = setInterval(function () {
+        secsLeft = totalSecs;
+        var tk = document.getElementById('tk').value.trim().toUpperCase();
+        if (tk) run();
+      }, totalSecs * 1000);
+    }
+    function stopAutoRefresh() {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      var el = document.getElementById('next-lbl');
+      if (el) el.textContent = '';
+    }
+    function toggleAuto() {
+      autoOn = !autoOn;
+      var btn = document.getElementById('autobtn');
+      if (autoOn) {
+        var tk = document.getElementById('tk').value.trim().toUpperCase();
+        if (!tk) { autoOn = false; return; }
+        btn.textContent = 'Auto ON';
+        btn.style.background = '#064e3b'; btn.style.borderColor = '#064e3b'; btn.style.color = '#34d399';
+        startAutoRefresh();
+        run();
+      } else {
+        btn.textContent = 'Auto OFF';
+        btn.style.background = '#dcfce7'; btn.style.borderColor = '#166534'; btn.style.color = '#166534';
+        stopAutoRefresh();
       }
     }
-  }
-
-  const curP = bars[n-1].c;
-  let poi = 'none';
-  if (structure === 'bullish') {
-    if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) poi = 'Bullish OB';
-    else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) poi = 'Bullish FVG';
-  } else if (structure === 'bearish') {
-    if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) poi = 'Bearish OB';
-    else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) poi = 'Bearish FVG';
-  }
-
-  return { structure, lastEvent, poi };
-}
-
-function analyze(dBars,hBars,ticker,macro){
-
-  const n=dBars.length,L=n-1;
-  const closes=dBars.map(b=>b.c);
-  const haD=ha(dBars);
-  const a5=atr(dBars,5),a13=atr(dBars,13);
-  const m13=mfi(dBars,13);
-  const ob=obv(dBars);
-  const{e:efiV,mu:efiMu,sig:efiSig}=efi(dBars,13,34);
-  const r8=rsi(closes,8);
-  const{h:mH}=macd(closes,13,21,8);
-  const bw=bbw(closes,21);
-  const adxV=adx(dBars,13);
-  const obvSlope=ob[L]>ob[L-3]?'rising':ob[L]<ob[L-3]?'falling':'flat';
-  const curBBW=bw[L],prvBBW=bw[L-1];
-  const bbwExp=curBBW!=null&&prvBBW!=null&&curBBW>prvBBW;
-  const bbw21Max=Math.max(...bw.slice(Math.max(0,L-21),L).filter(x=>x!=null));
-  const curAr=adxV[L],curEFI=efiV[L],curMu=efiMu[L],curSig=efiSig[L];
-  const curMFI=m13[L],curRSI=r8[L];
-  const curH=mH[L],prvH=mH[L-1];
-  const histRising=curH!=null&&prvH!=null&&curH>prvH;
-  let regime,regAct,regMult=1.0;
-  if(curBBW!=null&&curBBW>bbw21Max){regime='Volatile';regAct='Reduce to 0.191 Kelly';regMult=0.382;}
-  else if(curAr!=null&&curAr>25){regime='Trending';regAct='Momentum bias — follow HA';regMult=1.0;}
-  else if(curAr!=null&&curAr<20&&!bbwExp){regime='Mean-reverting';regAct='Fade extremes';regMult=0.618;}
-  else{regime='Transition';regAct='Reduce to 0.618, no fade';regMult=0.618;}
-  let flow='CLEAN';
-  if(curEFI!=null&&curMu!=null&&curSig!=null){
-    if(curEFI>curMu+2*curSig)flow='TOXIC BUY';
-    else if(curEFI<curMu-2*curSig)flow='TOXIC SELL';
-  }
-  let hHA='n/a',hRSI=null,hOBV='n/a',hEFIDir='n/a',flowMixed=false;
-  if(hBars&&hBars.length>20){
-    const hN=hBars.length-1;
-    const haH=ha(hBars);
-    hHA=haH[hN].hc>=haH[hN].ho?'bullish':'bearish';
-    const hR=rsi(hBars.map(b=>b.c),8);
-    hRSI=hR[hN];
-    const hO=obv(hBars);
-    hOBV=hO[hN]>hO[hN-3]?'rising':hO[hN]<hO[hN-3]?'falling':'flat';
-    const hSigN=Math.min(55,hBars.length-14);
-    if(hSigN>5){
-      const{e:hEFIV}=efi(hBars,13,hSigN);
-      const hEC=hEFIV[hN],hEP=hEFIV[hN-1];
-      if(hEC!=null&&hEP!=null)hEFIDir=hEC>hEP?'rising':'falling';
+    document.getElementById('interval-sel').addEventListener('change', function () {
+      if (autoOn) startAutoRefresh();
+    });
+    async function run() {
+      clearRetry();
+      var tk = document.getElementById('tk').value.trim().toUpperCase();
+      if (!tk) return;
+      var st = document.getElementById('st'), res = document.getElementById('res'), btn = document.getElementById('btn');
+      res.innerHTML = ''; btn.disabled = true;
+      try {
+        st.textContent = 'Fetching daily data...';
+        var daily = await fetchBars(tk, '1d', '6mo', st);
+        if (daily.length < 60) throw new Error('Not enough history (need 60+ days)');
+        st.textContent = 'Fetching 1-hour data...';
+        var hourly = null;
+        try { hourly = await fetchBars(tk, '1h', '5d', null); } catch (e) { }
+        st.textContent = 'Calculating indicators...';
+        var macro = await fetchMacro(null);
+        var r = analyze(daily, hourly, tk, macro);
+        var now = new Date().toLocaleTimeString();
+        st.textContent = tk + ' · ' + r.date + ' · ' + daily.length + ' bars · last updated ' + now;
+        render(r);
+      } catch (e) {
+        st.textContent = '';
+        if (e.message.indexOf('All sources failed') >= 0 || e.message.indexOf('Non-JSON') >= 0 || e.message.indexOf('Too Many') >= 0 || e.message.indexOf('Twelve Data') >= 0) {
+          startRetryCountdown(tk, 30);
+        } else {
+          res.innerHTML = '<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">Error: ' + e.message + '</div>';
+        }
+      } finally { btn.disabled = false; }
     }
-    const dEFIPrev=efiV[L-1];
-    const dEFIDir=curEFI!=null&&dEFIPrev!=null?(curEFI>dEFIPrev?'rising':'falling'):null;
-    if(dEFIDir&&hEFIDir!=='n/a'&&dEFIDir!==hEFIDir)flowMixed=true;
-  }
-  let f1=0,f1r='',f2=0,f2r='',f3=0,f3r='',f4=0,f4r='',f5=0,f5r='';
-  if(curMFI!=null){if(curMFI>55&&obvSlope==='rising'){f1=1;f1r='MFI '+curMFI.toFixed(1)+' >55 + OBV rising';}else if(curMFI<45&&obvSlope==='falling'){f1=-1;f1r='MFI '+curMFI.toFixed(1)+' <45 + OBV falling';}else{f1r='MFI '+curMFI.toFixed(1)+', OBV '+obvSlope;}}
-  if(curH!=null){if(curH>0&&histRising){f2=1;f2r='Hist +'+curH.toFixed(4)+' rising';}else if(curH<0&&!histRising){f2=-1;f2r='Hist '+curH.toFixed(4)+' falling';}else{f2r='Hist '+curH.toFixed(4)+' mixed';}}
-  if(curRSI!=null){if(curRSI>55){f3=1;f3r='RSI '+curRSI.toFixed(1)+' >55';}else if(curRSI<45){f3=-1;f3r='RSI '+curRSI.toFixed(1)+' <45';}else{f3r='RSI '+curRSI.toFixed(1)+' neutral';}}
+    document.getElementById('tk').addEventListener('keydown', function (e) { if (e.key === 'Enter') run(); });
+  </script>
 
-  // f4: EFI Momentum (Acceleration)
-  if(efiV[L]!=null&&efiV[L-1]!=null){
-    if(efiV[L]>efiV[L-1]){f4=1;f4r='EFI Force accelerating';}
-    else if(efiV[L]<efiV[L-1]){f4=-1;f4r='EFI Force decelerating';}
-    else{f4r='EFI Force flat';}
-  }else{f4r='EFI n/a';}
-
-  const avgVol = dBars.slice(Math.max(0, L - 19), L + 1).reduce((a, b) => a + (b.v || 0), 0) / 20;
-  const volRatio = avgVol > 0 ? dBars[L].v / avgVol : 0;
-
-  // f5: Vol Confirmation (VSA: Price direction + Relative Volume)
-  const isBullVol = (dBars[L].c > dBars[L].o) && (volRatio > 1.1);
-  const isBearVol = (dBars[L].c < dBars[L].o) && (volRatio > 1.1);
-  if(isBullVol){f5=1;f5r='High Vol Bull Candle';}
-  else if(isBearVol){f5=-1;f5r='High Vol Bear Candle';}
-  else{f5r='Vol alignment neutral';}
-
-  const smc = getSMC(dBars);
-  let score=f1+f2+f3+f4+f5;
-
-  // SMC Score Integration
-  let smcPoints = 0;
-  if (smc.structure === 'bullish') smcPoints += 1;
-  if (smc.structure === 'bearish') smcPoints -= 1;
-  if (smc.poi === 'Bullish OB') smcPoints += 2;
-  if (smc.poi === 'Bearish OB') smcPoints -= 2;
-  if (smc.poi === 'Bullish FVG') smcPoints += 1;
-  if (smc.poi === 'Bearish FVG') smcPoints -= 1;
-
-  if (score >= 0) score += Math.max(0, smcPoints);
-  else score += Math.min(0, smcPoints);
-
-  if(flowMixed)score=Math.max(-3,Math.min(3,score-1));
-  const haBar=haD[L];
-  const haBody=haBar?Math.abs(haBar.hc-haBar.ho)/(haBar.hh-haBar.hl||0.0001):0;
-  const infFlow=haBody>0.618&&a5[L]!=null&&Math.abs(dBars[L].c-dBars[L-1].c)>a5[L];
-  if(infFlow)regMult=Math.min(regMult,0.618);
-  let signal,sigClass;
-  if(flow!=='CLEAN'){signal='NO TRADE — '+flow;sigClass='sig-none';}
-  else if(score>=2){signal=score===3?'LONG — full position':'LONG — reduced position';sigClass='sig-long';}
-  else if(score<=-2){signal=score===-3?'SHORT — full position':'SHORT — reduced position';sigClass='sig-short';}
-  else{signal='NO TRADE — wait for alignment';sigClass='sig-none';}
-  const aligned=(signal.includes('LONG')&&hHA==='bullish')||(signal.includes('SHORT')&&hHA==='bearish');
-  const rsiOK=(signal.includes('LONG')&&hRSI!=null&&hRSI>55)||(signal.includes('SHORT')&&hRSI!=null&&hRSI<45);
-  const obvOK=(signal.includes('LONG')&&hOBV==='rising')||(signal.includes('SHORT')&&hOBV==='falling');
-  const entryReady=aligned&&rsiOK&&obvOK;
-  var macroPass=true,macroReason='',spyAbove=null,qqqAbove=null,vixOk=null;
-  if(macro){
-    spyAbove=macro.spyPrice!=null&&macro.spyEMA!=null?macro.spyPrice>macro.spyEMA:null;
-    qqqAbove=macro.qqqPrice!=null&&macro.qqqEMA!=null?macro.qqqPrice>macro.qqqEMA:null;
-    var isLong=score>=2,isShort=score<=-2;
-    if(isLong){
-      vixOk=macro.vix!=null?macro.vix<25:null;
-      var pts=(spyAbove===true?1:0)+(qqqAbove===true?1:0)+(vixOk===true?1:0);
-      if(pts<2){macroPass=false;macroReason='Macro does not support long';}
-    }else if(isShort){
-      vixOk=macro.vix!=null?macro.vix>20:null;
-      var pts2=(spyAbove===false?1:0)+(qqqAbove===false?1:0)+(vixOk===true?1:0);
-      if(pts2<2){macroPass=false;macroReason='Macro does not support short';}
-    }else{vixOk=macro.vix!=null?macro.vix<25:null;}
-    if(!macroPass){signal='NO TRADE — macro blocked';sigClass='sig-none';}
-  }
-
-  const volState = volRatio > 1.5 ? 'High' : volRatio < 0.7 ? 'Low' : 'Normal';
-  const volAnalysis = `${volState} Vol / ${obvSlope} OBV`;
-
-  return{regime,regAct,regMult,curAr,curBBW,bbwExp,flow,flowMixed,curEFI,curMu,curSig,
-    f1,f1r,f2,f2r,f3,f3r,f4,f4r,f5,f5r,score,infFlow,haBody:haBody.toFixed(3),
-    signal,sigClass,a5:a5[L],a13:a13[L],bbwState:bbwExp?'expanding':'contracting',
-    hHA,hRSI,hOBV,hEFIDir,entryReady,ticker,date:dBars[L].date.toLocaleDateString(),
-    macroPass,macroReason,spyAbove,qqqAbove,vixOk,
-    spyPrice:macro?macro.spyPrice:null,spyEMA:macro?macro.spyEMA:null,
-    qqqPrice:macro?macro.qqqPrice:null,qqqEMA:macro?macro.qqqEMA:null,
-    vix:macro?macro.vix:null,
-    volAnalysis, smc};
-}
-function b(t,c){return'<span class="badge '+c+'">'+t+'</span>';}
-function fb(s){return s===1?b('+1','bg'):s===-1?b('-1','br'):b('0','bn');}
-function sb(s){return s>0?b('+'+s,'bg'):s<0?b(s,'br'):b('0','bn');}
-function fmt(v,d){d=d||3;return v!=null?Number(v).toFixed(d):'n/a';}
-function fmtE(v){
-  if(v==null)return 'n/a';
-  const absV=Math.abs(v);
-  if(absV>=1e9)return(v/1e9).toFixed(2)+'B';
-  if(absV>=1e6)return(v/1e6).toFixed(2)+'M';
-  if(absV>=1e3)return(v/1e3).toFixed(2)+'K';
-  return v.toFixed(2);
-}
-function render(r){
-  const regC=r.regime==='Trending'?'bg':r.regime==='Volatile'?'br':r.regime==='Mean-reverting'?'bw':'bn';
-  const smcC = r.smc.structure==='bullish'?'bg':r.smc.structure==='bearish'?'br':'bn';
-  const poiC = r.smc.poi.includes('Bullish')?'bg':r.smc.poi.includes('Bearish')?'br':'bn';
-  const smcCard = '<div class="card"><div class="s-title">1.5 &middot; SMC Analysis</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.smc.structure.toUpperCase(),smcC)+b(r.smc.lastEvent,smcC)+'</div>'+
-    '<div class="g2"><div><div class="lbl">Market Structure</div><div class="val">'+r.smc.structure+'</div></div>'+
-    '<div><div class="lbl">Current POI</div><div class="val">'+b(r.smc.poi,poiC)+'</div></div></div></div>';
-
-  const flowC=r.flow==='CLEAN'?'bg':r.flow.indexOf('TOXIC')>=0?'br':'bw';
-  const entC=r.entryReady?'bg':r.hHA==='n/a'?'bn':'bw';
-  const entTxt=r.entryReady?'READY':r.hHA==='n/a'?'NO 1H DATA':'PENDING';
-  const infC=r.infFlow?'bw':'bg';
-  const sigW=r.curSig!=null?'&plusmn;'+fmtE(2*r.curSig):'n/a';
-  document.getElementById('res').innerHTML=
-'<div class="card"><div class="s-title">Step 0 &middot; Macro gate</div>'+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.macroPass===false?'Macro blocked':'Macro pass',r.macroPass===false?'br':'bg')+(r.macroReason?'<span style="font-size:12px;color:#a32d2d;margin-left:6px">'+r.macroReason+'</span>':'')+'</div>'+'<div class="g3">'+'<div><div class="lbl">SPY vs EMA(21)</div><div class="val">'+(r.spyPrice!=null?r.spyPrice.toFixed(2):'--')+' '+b(r.spyAbove===true?'above':'below',r.spyAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">'+(r.qqqPrice!=null?r.qqqPrice.toFixed(2):'--')+' '+b(r.qqqAbove===true?'above':'below',r.qqqAbove===true?'bg':'br')+'</div></div>'+'<div><div class="lbl">VIX</div><div class="val">'+(r.vix!=null?r.vix.toFixed(2):'--')+' '+b(r.vix!=null?(r.vix<25?'normal':'elevated'):'--',r.vix!=null?(r.vix<25?'bg':'bw'):'bn')+'</div></div>'+'</div></div>'+
-'<div class="card"><div class="s-title">1 &middot; Regime</div>'+
-'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+b(r.regime,regC)+'<span style="font-size:12px;color:#888780">'+r.regAct+'</span></div>'+
-'<div class="g3"><div><div class="lbl">ADX(13)</div><div class="val">'+fmt(r.curAr,1)+'</div></div>'+
-'<div><div class="lbl">BBW(21)</div><div class="val">'+fmt(r.curBBW,4)+' <span style="font-size:11px;color:#888780">'+r.bbwState+'</span></div></div>'+
-'<div><div class="lbl">Vol Analysis</div><div class="val">'+r.volAnalysis+'</div></div></div></div>'+
-smcCard+
-'<div class="card"><div class="s-title">2 &middot; Toxic flow check (EFI)</div>'+
-'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'+b(r.flow,flowC)+(r.flowMixed?b('MIXED &mdash; 1H contradicts daily','bw'):'')+'</div>'+
-'<div class="g3"><div><div class="lbl">EFI(13) current</div><div class="val mono">'+fmtE(r.curEFI)+'</div></div>'+
-'<div><div class="lbl">55D mean</div><div class="val mono">'+fmtE(r.curMu)+'</div></div>'+
-'<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">'+sigW+'</div></div></div></div>'+
-'<div class="card"><div class="s-title">3 &middot; Alpha score</div>'+
-'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f1r+'</span>'+fb(r.f1)+'</div>'+
-'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f2r+'</span>'+fb(r.f2)+'</div>'+
-'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f3r+'</span>'+fb(r.f3)+'</div>'+
-'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f4r+'</span>'+fb(r.f4)+'</div>'+
-'<div class="frow"><span style="font-size:13px;color:#5f5e5a;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#888780;flex:1;text-align:right;padding-right:10px">'+r.f5r+'</span>'+fb(r.f5)+'</div>'+
-'<div style="margin-top:8px;display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:500">Total</span>'+sb(r.score)+(r.flowMixed?'<span style="font-size:11px;color:#854f0b">(-1 for mixed flow)</span>':'')+'</div></div>'+
-'<div class="sig '+r.sigClass+'"><div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px">Signal</div><div class="sv">'+r.signal+'</div></div>'+
-'<div class="card"><div class="s-title">4 &middot; Adverse selection</div>'+
-'<div style="margin-bottom:8px">'+b(r.infFlow?'Informed flow &mdash; reduce size':'None detected',infC)+'</div>'+
-'<div class="g2"><div><div class="lbl">HA body ratio</div><div class="val">'+r.haBody+' <span style="font-size:11px;color:#888780">/ 0.618</span></div></div>'+
-'<div><div class="lbl">ATR(5)</div><div class="val">'+fmt(r.a5)+'</div></div></div></div>'+
-'<div class="card"><div class="s-title">5 &middot; Volatility state</div>'+
-'<div class="g2"><div><div class="lbl">BBW state</div><div class="val">'+r.bbwState+'</div></div>'+
-'<div><div class="lbl">ATR(13)</div><div class="val">'+fmt(r.a13)+'</div></div></div>'+
-'<div style="margin-top:8px;font-size:12px;color:#888780">Switch to static ATR at day 8 of hold</div></div>'+
-'<div class="card"><div class="s-title">6 &middot; Position size</div>'+
-'<div class="sz-box">Size = (Account &times; 0.01) &divide; '+fmt(r.a13)+' &times; '+r.regMult+'<br><span style="font-size:11px;color:#888780">Kelly &gamma; 0.382 &middot; regime multiplier '+r.regMult+'</span></div></div>'+
-'<div class="card"><div class="s-title">7 &middot; 1H entry timing</div>'+
-'<div style="margin-bottom:8px">'+b(entTxt,entC)+'</div>'+
-'<div class="g2"><div><div class="lbl">1H HA color</div><div class="val">'+r.hHA+'</div></div>'+
-'<div><div class="lbl">1H RSI(8)</div><div class="val">'+(r.hRSI!=null?r.hRSI.toFixed(1):'n/a')+'</div></div>'+
-'<div><div class="lbl">1H OBV slope</div><div class="val">'+r.hOBV+'</div></div>'+
-'<div><div class="lbl">1H EFI direction</div><div class="val">'+r.hEFIDir+'</div></div></div></div>';
-}
-let retryTimer=null,autoTimer=null,countdownTimer=null,autoOn=false;
-function clearRetry(){if(retryTimer){clearInterval(retryTimer);retryTimer=null;}}
-function startRetryCountdown(tk,secs){
-  var res=document.getElementById('res');
-  var t=secs;
-  res.innerHTML='<div id="retry-box" style="font-size:13px;padding:.75rem 0;color:#5f5e5a">Rate limited — auto-retrying in <span id="cd">'+t+'</span>s... <button onclick="clearRetry();run()" style="margin-left:8px;font-size:12px;padding:4px 10px">Retry now</button></div>';
-  retryTimer=setInterval(function(){
-    t--;var el=document.getElementById('cd');
-    if(el)el.textContent=t;
-    if(t<=0){clearRetry();run();}
-  },1000);
-}
-function updateNextLabel(secsLeft){
-  var el=document.getElementById('next-lbl');
-  if(!el||!autoOn){if(el)el.textContent='';return;}
-  var m=Math.floor(secsLeft/60),s=secsLeft%60;
-  el.textContent='· next refresh in '+(m>0?m+'m ':'')+s+'s';
-}
-function startAutoRefresh(){
-  if(autoTimer)clearInterval(autoTimer);
-  if(countdownTimer)clearInterval(countdownTimer);
-  var mins=parseInt(document.getElementById('interval-sel').value)||5;
-  var totalSecs=mins*60,secsLeft=totalSecs;
-  updateNextLabel(secsLeft);
-  countdownTimer=setInterval(function(){
-    secsLeft--;
-    if(secsLeft<=0)secsLeft=totalSecs;
-    updateNextLabel(secsLeft);
-  },1000);
-  autoTimer=setInterval(function(){
-    secsLeft=totalSecs;
-    var tk=document.getElementById('tk').value.trim().toUpperCase();
-    if(tk)run();
-  },totalSecs*1000);
-}
-function stopAutoRefresh(){
-  if(autoTimer){clearInterval(autoTimer);autoTimer=null;}
-  if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null;}
-  var el=document.getElementById('next-lbl');
-  if(el)el.textContent='';
-}
-function toggleAuto(){
-  autoOn=!autoOn;
-  var btn=document.getElementById('autobtn');
-  if(autoOn){
-    var tk=document.getElementById('tk').value.trim().toUpperCase();
-    if(!tk){autoOn=false;return;}
-    btn.textContent='Auto ON';
-    btn.style.background='#064e3b';btn.style.borderColor='#064e3b';btn.style.color='#34d399';
-    startAutoRefresh();
-    run();
-  }else{
-    btn.textContent='Auto OFF';
-    btn.style.background='#dcfce7';btn.style.borderColor='#166534';btn.style.color='#166534';
-    stopAutoRefresh();
-  }
-}
-document.getElementById('interval-sel').addEventListener('change',function(){
-  if(autoOn)startAutoRefresh();
-});
-async function run(){
-  clearRetry();
-  var tk=document.getElementById('tk').value.trim().toUpperCase();
-  if(!tk)return;
-  var st=document.getElementById('st'),res=document.getElementById('res'),btn=document.getElementById('btn');
-  res.innerHTML='';btn.disabled=true;
-  try{
-    st.textContent='Fetching daily data...';
-    var daily=await fetchBars(tk,'1d','6mo',st);
-    if(daily.length<60)throw new Error('Not enough history (need 60+ days)');
-    st.textContent='Fetching 1-hour data...';
-    var hourly=null;
-    try{hourly=await fetchBars(tk,'1h','5d',null);}catch(e){}
-    st.textContent='Calculating indicators...';
-    var macro=await fetchMacro(null);
-    var r=analyze(daily,hourly,tk,macro);
-    var now=new Date().toLocaleTimeString();
-    st.textContent=tk+' · '+r.date+' · '+daily.length+' bars · last updated '+now;
-    render(r);
-  }catch(e){
-    st.textContent='';
-    if(e.message.indexOf('All sources failed')>=0||e.message.indexOf('Non-JSON')>=0||e.message.indexOf('Too Many')>=0||e.message.indexOf('Twelve Data')>=0){
-      startRetryCountdown(tk,30);
-    }else{
-      res.innerHTML='<div style="color:#a32d2d;font-size:13px;padding:.5rem 0">Error: '+e.message+'</div>';
+  <div id="timer-bar"
+    style="display:none;position:sticky;bottom:0;border-top:1px solid #e8e6df;padding:10px 0;text-align:center;font-size:12px">
+    Auto-refresh in <span id="timer-cd" style="font-weight:500;font-family:monospace">5:00</span>
+    &nbsp;<button onclick="resetTimer();run()" style="font-size:11px;padding:3px 10px">Refresh now</button>
+    &nbsp;<button onclick="stopTimer()" style="font-size:11px;padding:3px 10px">Stop</button>
+  </div>
+  <script>
+    let _ti = null, _ts = 300;
+    function stopTimer() { clearInterval(_ti); _ti = null; document.getElementById('timer-bar').style.display = 'none'; }
+    function resetTimer() {
+      clearInterval(_ti); _ts = 300;
+      document.getElementById('timer-bar').style.display = 'block';
+      _ti = setInterval(() => {
+        _ts--;
+        const m = Math.floor(_ts / 60), s = _ts % 60;
+        const el = document.getElementById('timer-cd');
+        if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+        if (_ts <= 0) { _ts = 300; run(); }
+      }, 1000);
     }
-  }finally{btn.disabled=false;}
-}
-document.getElementById('tk').addEventListener('keydown',function(e){if(e.key==='Enter')run();});
-</script>
-
-<div id="timer-bar" style="display:none;position:sticky;bottom:0;border-top:1px solid #e8e6df;padding:10px 0;text-align:center;font-size:12px">
-  Auto-refresh in <span id="timer-cd" style="font-weight:500;font-family:monospace">5:00</span>
-  &nbsp;<button onclick="resetTimer();run()" style="font-size:11px;padding:3px 10px">Refresh now</button>
-  &nbsp;<button onclick="stopTimer()" style="font-size:11px;padding:3px 10px">Stop</button>
-</div>
-<script>
-let _ti=null,_ts=300;
-function stopTimer(){clearInterval(_ti);_ti=null;document.getElementById('timer-bar').style.display='none';}
-function resetTimer(){
-  clearInterval(_ti);_ts=300;
-  document.getElementById('timer-bar').style.display='block';
-  _ti=setInterval(()=>{
-    _ts--;
-    const m=Math.floor(_ts/60),s=_ts%60;
-    const el=document.getElementById('timer-cd');
-    if(el)el.textContent=m+':'+(s<10?'0':'')+s;
-    if(_ts<=0){_ts=300;run();}
-  },1000);
-}
-const _origRun=run;
-window.run=async function(){
-  await _origRun.apply(this,arguments);
-  const tk=document.getElementById('tk').value.trim();
-  if(tk&&!_ti)resetTimer();
-  else if(tk&&_ti){_ts=300;}
-};
-</script>
+    const _origRun = run;
+    window.run = async function () {
+      await _origRun.apply(this, arguments);
+      const tk = document.getElementById('tk').value.trim();
+      if (tk && !_ti) resetTimer();
+      else if (tk && _ti) { _ts = 300; }
+    };
+  </script>
 </body>
+
 </html>
