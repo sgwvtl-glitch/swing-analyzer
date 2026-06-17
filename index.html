@@ -143,11 +143,33 @@
       flex-direction: column;
     }
 
+    .small-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .small-cards-grid .card {
+      margin-bottom: 0;
+    }
+
     @media (max-width: 768px) {
       .dashboard-grid {
-        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 1.25rem;
       }
+      .col-left, .col-right {
+        display: contents;
+      }
+      #sig-card { order: 1; }
+      #card-step0 { order: 2; }
+      #card-step1 { order: 3; }
+      #card-step2 { order: 4; }
+      #card-step3 { order: 5; }
+      #grid-steps-4-7 { order: 6; }
+      #card-step8 { order: 7; }
       body {
         padding: 1rem;
       }
@@ -468,7 +490,7 @@
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     async function fetchTD(ticker, interval, outputsize) {
-      const ivMap = { '1d': '1day', '1h': '1h' };
+      const ivMap = { '1d': '1day', '1h': '1h', '15m': '15min' };
       const url = `https://api.twelvedata.com/time_series?symbol=${ticker}&interval=${ivMap[interval]}&outputsize=${outputsize}&apikey=${TD_KEY}`;
       const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
       const d = await r.json();
@@ -497,7 +519,7 @@
     async function fetchBars(ticker, interval, range, stEl) {
       if (stEl) stEl.textContent = 'Fetching from Twelve Data...';
       try {
-        const size = interval === '1d' ? 130 : 120;
+        const size = interval === '1d' ? 130 : (interval === '15m' ? 20 : 120);
         return await fetchTD(ticker, interval, size);
       } catch (e) {
         if (stEl) stEl.textContent = 'Twelve Data failed, trying fallback...';
@@ -627,7 +649,80 @@
       return { structure, lastEvent, poi, breakdown };
     }
 
-    function analyze(dBars, hBars, ticker, macro) {
+    function get15MSMC(candles) {
+      if (!candles || candles.length < 5) return null;
+      const parsed = candles.map(c => ({
+        open: c.o,
+        high: c.h,
+        low: c.l,
+        close: c.c,
+        volume: c.v
+      }));
+      const current = parsed[parsed.length - 1];
+      const prev = parsed[parsed.length - 2];
+      const pprev = parsed[parsed.length - 3];
+      const lastPrice = current.close;
+      const rawVol = parsed.reduce((sum, c) => sum + c.volume, 0) / parsed.length;
+      const volumeStr = rawVol > 1000000 ? `${(rawVol / 1000000).toFixed(2)}M` : `${(rawVol / 1000).toFixed(0)}K`;
+      const ma = parsed.reduce((sum, c) => sum + c.close, 0) / parsed.length;
+      const isBullishBias = current.close > ma;
+      const biasText = isBullishBias ? 'BULLISH STRUCTURE' : 'BEARISH STRUCTURE';
+      const haClose = (current.open + current.high + current.low + current.close) / 4;
+      const haOpen = (prev.open + prev.close) / 2;
+      const isHaGreen = haClose > haOpen;
+      const haText = isHaGreen ? 'HA BULLISH (GREEN)' : 'HA BEARISH (RED)';
+      let fvgPrice = "MITIGATED (NONE)";
+      let hasBullishFVG = pprev.high < current.low;
+      let hasBearishFVG = pprev.low > current.high;
+      if (hasBullishFVG) {
+        fvgPrice = `$${pprev.high.toFixed(2)} - $${current.low.toFixed(2)}`;
+      } else if (hasBearishFVG) {
+        fvgPrice = `$${current.high.toFixed(2)} - $${pprev.low.toFixed(2)}`;
+      }
+      let action = "", actionReasoning = "", entryPrice = 0, slPrice = 0;
+      let actionClass = "";
+      if (isBullishBias) {
+        entryPrice = Math.min(prev.open, prev.close) * 0.998;
+        slPrice = Math.min(...parsed.slice(-5).map(c => c.low)) * 0.995;
+        if (isHaGreen && hasBullishFVG) {
+          action = "STRONG BUY / LIMIT";
+          actionClass = "sig-long";
+          actionReasoning = "Market Structure is firmly Bullish. High-velocity FVG discovered inside discount zone. Heikin-Ashi confirms intense institutional accumulation momentum. Set Limit Orders near Order Block.";
+        } else {
+          action = "MONITOR / RETRACE";
+          actionClass = "sig-none";
+          actionReasoning = "Structure bias remains positive, but lower timeframe exhibits temporary exhaustion or lacks clear institutional imbalance. Await sweep of internal liquidity pools prior to execution.";
+        }
+      } else {
+        entryPrice = Math.max(prev.open, prev.close) * 1.002;
+        slPrice = Math.max(...parsed.slice(-5).map(c => c.high)) * 1.005;
+        if (!isHaGreen && hasBearishFVG) {
+          action = "STRONG SHORT / LIMIT";
+          actionClass = "sig-short";
+          actionReasoning = "Market Structure has fractured into Bearish expansion. Bearish FVG is left unfilled above. Heikin-Ashi registers clear distribution cells. Deploy short inventory on premium pullback.";
+        } else {
+          action = "MONITOR / CONSOLIDATE";
+          actionClass = "sig-none";
+          actionReasoning = "Bearish macro flow detected, but compression range is tightly bound. Avoid chase entries. Exercise patience until premium mitigation occurs near institutional blocks.";
+        }
+      }
+      return {
+        lastPrice,
+        volumeStr,
+        isBullishBias,
+        biasText,
+        isHaGreen,
+        haText,
+        fvgPrice,
+        action,
+        actionClass,
+        actionReasoning,
+        entryPrice,
+        slPrice
+      };
+    }
+
+    function analyze(dBars, hBars, ticker, macro, min15) {
 
 
 
@@ -702,6 +797,7 @@
       else { f5r = 'Vol alignment neutral'; }
 
       const smc = getSMC(dBars);
+      const smc15m = get15MSMC(min15);
       let score = f1 + f2 + f3 + f4 + f5 + smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
 
     if (flowMixed) score -= 1;
@@ -747,7 +843,8 @@
         spyPrice: macro ? macro.spyPrice : null, spyEMA: macro ? macro.spyEMA : null,
         qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA : null,
         vix: macro ? macro.vix : null,
-        volAnalysis, smc
+        volAnalysis, smc,
+        smc15m
       };
     }
     function b(t, c) { return '<span class="badge ' + c + '">' + t + '</span>'; }
@@ -780,13 +877,13 @@
         '<div class="dashboard-grid">' +
           '<div class="col-left">' +
             // Signal Card
-            '<div class="sig ' + r.sigClass + '">' +
+            '<div class="sig ' + r.sigClass + '" id="sig-card">' +
               '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
               '<div class="sv">' + r.signal + '</div>' +
             '</div>' +
             
             // Step 0 - Macro Gate Card
-            '<div class="card">' +
+            '<div class="card" id="card-step0">' +
               '<div class="s-title">Step 0 &middot; Macro gate</div>' +
               '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
                 b(r.macroPass === false ? 'Macro blocked' : 'Macro pass', r.macroPass === false ? 'br' : 'bg') +
@@ -800,7 +897,7 @@
             '</div>' +
             
             // Step 3 - Alpha Score Card
-            '<div class="card">' +
+            '<div class="card" id="card-step3">' +
               '<div class="s-title">3 &middot; Alpha score</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f1r + '</span>' + fb(r.f1) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f2r + '</span>' + fb(r.f2) + '</div>' +
@@ -812,11 +909,26 @@
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
               '<div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:600">Total Score</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#b45309;font-weight:500">(-1 for mixed flow)</span>' : '') + '</div>' +
             '</div>' +
+            (r.smc15m ?
+            '<div class="card" id="card-step8">' +
+              '<div class="s-title">Step 8 &middot; 15M SMC Confluence</div>' +
+              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+                b(r.smc15m.action, r.smc15m.actionClass === 'sig-long' ? 'bg' : r.smc15m.actionClass === 'sig-short' ? 'br' : 'bn') +
+                b(r.smc15m.biasText, r.smc15m.isBullishBias ? 'bg' : 'br') +
+                b(r.smc15m.haText, r.smc15m.isHaGreen ? 'bg' : 'br') +
+              '</div>' +
+              '<div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:12px">' + r.smc15m.actionReasoning + '</div>' +
+              '<div class="g3">' +
+                '<div><div class="lbl">OB Entry Price</div><div class="val" style="font-weight:600">$' + r.smc15m.entryPrice.toFixed(2) + '</div></div>' +
+                '<div><div class="lbl">Invalidation (SL)</div><div class="val" style="font-weight:600">$' + r.smc15m.slPrice.toFixed(2) + '</div></div>' +
+                '<div><div class="lbl">FVG Imbalance</div><div class="val" style="font-size:11px">' + r.smc15m.fvgPrice + '</div></div>' +
+              '</div>' +
+            '</div>' : '') +
           '</div>' +
           
           '<div class="col-right">' +
             // Step 1 - Regime Card
-            '<div class="card">' +
+            '<div class="card" id="card-step1">' +
               '<div class="s-title">1 &middot; Regime</div>' +
               '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + b(r.regime, regC) + '<span style="font-size:12px;color:#64748b">' + r.regAct + '</span></div>' +
               '<div class="g3">' +
@@ -827,7 +939,7 @@
             '</div>' +
             
             // Step 2 - Toxic Flow Check Card
-            '<div class="card">' +
+            '<div class="card" id="card-step2">' +
               '<div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
               '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
               '<div class="g3">' +
@@ -838,46 +950,45 @@
             '</div>' +
             
             // Step 4 - Adverse Selection Card
-            '<div class="card">' +
-              '<div class="s-title">4 &middot; Adverse selection</div>' +
-              '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
-              '<div class="g2">' +
-                '<div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#64748b">/ 0.618</span></div></div>' +
-                '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div>' +
+            '<div class="small-cards-grid" id="grid-steps-4-7">' +
+              '<div class="card" id="card-step4">' +
+                '<div class="s-title">4 &middot; Adverse selection</div>' +
+                '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
+                '<div class="g2">' +
+                  '<div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#64748b">/ 0.618</span></div></div>' +
+                  '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div>' +
+                '</div>' +
               '</div>' +
-            '</div>' +
-            
-            // Step 5 - Volatility State Card
-            '<div class="card">' +
-              '<div class="s-title">5 &middot; Volatility state</div>' +
-              '<div class="g2">' +
-                '<div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
-                '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div>' +
+              
+              '<div class="card" id="card-step5">' +
+                '<div class="s-title">5 &middot; Volatility state</div>' +
+                '<div class="g2">' +
+                  '<div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
+                  '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div>' +
+                '</div>' +
+                '<div style="margin-top:10px;font-size:12px;color:#64748b;font-style:italic">Switch to static ATR at day 8 of hold</div>' +
               '</div>' +
-              '<div style="margin-top:10px;font-size:12px;color:#64748b;font-style:italic">Switch to static ATR at day 8 of hold</div>' +
-            '</div>' +
-            
-            // Step 6 - Position Size Card
-            '<div class="card">' +
-              '<div class="s-title">6 &middot; Position size</div>' +
-              '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#64748b">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div>' +
-            '</div>' +
-            
-            // Step 7 - 1H Entry Timing Card
-            '<div class="card">' +
-              '<div class="s-title">7 &middot; 1H entry timing</div>' +
-              '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
-              '<div class="g2">' +
-                '<div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
-                '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
-                '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
-                '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div>' +
+              
+              '<div class="card" id="card-step6">' +
+                '<div class="s-title">6 &middot; Position size</div>' +
+                '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#64748b">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div>' +
+              '</div>' +
+              
+              '<div class="card" id="card-step7">' +
+                '<div class="s-title">7 &middot; 1H entry timing</div>' +
+                '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
+                '<div class="g2">' +
+                  '<div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
+                  '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
+                  '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
+                  '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div>' +
+                '</div>' +
               '</div>' +
             '</div>' +
           '</div>' +
         '</div>';
     }
-    let retryTimer = null, autoTimer = null, countdownTimer = null, autoOn = false;
+    let retryTimer = null;
     function clearRetry() { if (retryTimer) { clearInterval(retryTimer); retryTimer = null; } }
     function startRetryCountdown(tk, secs) {
       var res = document.getElementById('res');
@@ -889,54 +1000,6 @@
         if (t <= 0) { clearRetry(); run(); }
       }, 1000);
     }
-    function updateNextLabel(secsLeft) {
-      var el = document.getElementById('next-lbl');
-      if (!el || !autoOn) { if (el) el.textContent = ''; return; }
-      var m = Math.floor(secsLeft / 60), s = secsLeft % 60;
-      el.textContent = '· next refresh in ' + (m > 0 ? m + 'm ' : '') + s + 's';
-    }
-    function startAutoRefresh() {
-      if (autoTimer) clearInterval(autoTimer);
-      if (countdownTimer) clearInterval(countdownTimer);
-      var mins = parseInt(document.getElementById('interval-sel').value) || 5;
-      var totalSecs = mins * 60, secsLeft = totalSecs;
-      updateNextLabel(secsLeft);
-      countdownTimer = setInterval(function () {
-        secsLeft--;
-        if (secsLeft <= 0) secsLeft = totalSecs;
-        updateNextLabel(secsLeft);
-      }, 1000);
-      autoTimer = setInterval(function () {
-        secsLeft = totalSecs;
-        var tk = document.getElementById('tk').value.trim().toUpperCase();
-        if (tk) run();
-      }, totalSecs * 1000);
-    }
-    function stopAutoRefresh() {
-      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-      var el = document.getElementById('next-lbl');
-      if (el) el.textContent = '';
-    }
-    function toggleAuto() {
-      autoOn = !autoOn;
-      var btn = document.getElementById('autobtn');
-      if (autoOn) {
-        var tk = document.getElementById('tk').value.trim().toUpperCase();
-        if (!tk) { autoOn = false; return; }
-        btn.textContent = 'Auto ON';
-        btn.style.background = '#064e3b'; btn.style.borderColor = '#064e3b'; btn.style.color = '#34d399';
-        startAutoRefresh();
-        run();
-      } else {
-        btn.textContent = 'Auto OFF';
-        btn.style.background = '#dcfce7'; btn.style.borderColor = '#166534'; btn.style.color = '#166534';
-        stopAutoRefresh();
-      }
-    }
-    document.getElementById('interval-sel').addEventListener('change', function () {
-      if (autoOn) startAutoRefresh();
-    });
     async function run() {
       clearRetry();
       var tk = document.getElementById('tk').value.trim().toUpperCase();
@@ -950,9 +1013,12 @@
         st.textContent = 'Fetching 1-hour data...';
         var hourly = null;
         try { hourly = await fetchBars(tk, '1h', '5d', null); } catch (e) { }
+        st.textContent = 'Fetching 15-minute data...';
+        var min15 = null;
+        try { min15 = await fetchBars(tk, '15m', '1d', null); } catch (e) { }
         st.textContent = 'Calculating indicators...';
         var macro = await fetchMacro(null);
-        var r = analyze(daily, hourly, tk, macro);
+        var r = analyze(daily, hourly, tk, macro, min15);
         var now = new Date().toLocaleTimeString();
         st.textContent = tk + ' · ' + r.date + ' · ' + daily.length + ' bars · last updated ' + now;
         render(r);
