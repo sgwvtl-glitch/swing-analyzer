@@ -874,14 +874,12 @@
       const sigW = r.curSig != null ? '&plusmn;' + fmtE(2 * r.curSig) : 'n/a';
       
       document.getElementById('res').innerHTML =
+        '<div class="sig ' + r.sigClass + '" id="sig-card">' +
+          '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
+          '<div class="sv">' + r.signal + '</div>' +
+        '</div>' +
         '<div class="dashboard-grid">' +
           '<div class="col-left">' +
-            // Signal Card
-            '<div class="sig ' + r.sigClass + '" id="sig-card">' +
-              '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
-              '<div class="sv">' + r.signal + '</div>' +
-            '</div>' +
-            
             // Step 0 - Macro Gate Card
             '<div class="card" id="card-step0">' +
               '<div class="s-title">Step 0 &middot; Macro gate</div>' +
