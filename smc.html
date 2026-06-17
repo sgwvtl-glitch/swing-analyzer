@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMC Institutional Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+
+<body class="bg-[#0B0E14] text-gray-100 min-h-screen pb-12">
+
+    <header class="border-b border-gray-800 bg-[#121620] sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <h1 class="text-lg font-bold tracking-wider uppercase text-gray-200">SMC · ALGO MONITOR</h1>
+            </div>
+            <div class="text-xs text-gray-400 font-medium tracking-wide">
+                Auto-Refresh: <span id="countdown" class="text-amber-500 mono font-bold">05:00</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 mt-6">
+        <section class="bg-[#121620] border border-gray-800 rounded-xl p-4 mb-6 shadow-xl">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="flex-1">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1.5">Asset
+                        Symbol</label>
+                    <input type="text" id="symbolInput" placeholder="e.g. TSL, MSTR, QQQ"
+                        class="w-full bg-[#181E2A] border border-gray-700 rounded-lg px-4 py-2.5 text-sm uppercase font-bold tracking-widest text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="handleSymbolChange()"
+                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold tracking-wide px-6 py-2.5 rounded-lg transition-all shadow-lg active:scale-[0.98]">
+                        ANALYZE MARKET
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div id="loader" class="hidden text-center py-12">
+            <div
+                class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin">
+            </div>
+            <p class="text-xs text-gray-400 mt-2 font-medium tracking-widest uppercase">Fetching Institutional Data...
+            </p>
+        </div>
+
+        <div id="dashboardContent" class="hidden space-y-6">
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-[#121620] border border-gray-800 rounded-xl p-4">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Last Price</p>
+                    <p id="lastPrice" class="text-xl font-bold text-white mono">--</p>
+                </div>
+                <div class="bg-[#121620] border border-gray-800 rounded-xl p-4">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Volume (24h)</p>
+                    <p id="marketVolume" class="text-xl font-bold text-white mono">--</p>
+                </div>
+                <div class="bg-[#121620] border border-gray-800 rounded-xl p-4">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">Market Bias</p>
+                    <span id="marketBias"
+                        class="inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5">--</span>
+                </div>
+                <div class="bg-[#121620] border border-gray-800 rounded-xl p-4">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">HA Candle State</p>
+                    <span id="haState"
+                        class="inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5">--</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div
+                    class="md:col-span-1 bg-[#121620] border border-gray-800 rounded-xl p-5 flex flex-col justify-between shadow-xl">
+                    <div>
+                        <h3
+                            class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 border-b border-gray-800 pb-2">
+                            Institutional Action</h3>
+                        <div id="actionBadge"
+                            class="text-center py-4 rounded-xl text-lg font-black tracking-widest uppercase mb-4">
+                            --
+                        </div>
+                        <p class="text-xs text-gray-400 leading-relaxed" id="actionReasoning">--</p>
+                    </div>
+                    <div
+                        class="mt-6 pt-4 border-t border-gray-800 text-[10px] text-gray-500 tracking-wider font-medium">
+                        EXECUTION BAR: 15M / 1H CONFLUENCE
+                    </div>
+                </div>
+
+                <div class="md:col-span-2 bg-[#121620] border border-gray-800 rounded-xl p-5 shadow-xl">
+                    <h3
+                        class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 border-b border-gray-800 pb-2">
+                        Order Management Matrix</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="border-b border-gray-800 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                                    <th class="pb-3">Matrix Node</th>
+                                    <th class="pb-3 text-right">Execution Price</th>
+                                    <th class="pb-3 text-right">Target / Condition</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800/50 text-sm mono">
+                                <tr>
+                                    <td class="py-3.5 text-xs font-semibold tracking-wider uppercase text-gray-400">
+                                        Order Block (OB) Entry</td>
+                                    <td id="paramEntry" class="py-3.5 text-right font-bold text-emerald-400">--</td>
+                                    <td class="py-3.5 text-right text-xs text-gray-400">Limit Buy Order Zone</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3.5 text-xs font-semibold tracking-wider uppercase text-gray-400">
+                                        Invalidation Level (SL)</td>
+                                    <td id="paramSL" class="py-3.5 text-right font-bold text-rose-500">--</td>
+                                    <td class="py-3.5 text-right text-xs text-gray-400">Liquidity Sweep Low</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-3.5 text-xs font-semibold tracking-wider uppercase text-gray-400">Fair
+                                        Value Gap (FVG)</td>
+                                    <td id="paramFVG" class="py-3.5 text-right font-bold text-amber-400">--</td>
+                                    <td class="py-3.5 text-right text-xs text-gray-400">Imbalance Inefficient Zone</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // 配置中心：在此处直接输入您的 Twelve Data API Key
+        const TWELVE_DATA_API_KEY = "934f233f1c934c92a767bb9e52191d6d";
+
+        let refreshInterval;
+        let countdownInterval;
+        const REFRESH_TIME = 300; // 5分钟 = 300秒
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedSymbol = localStorage.getItem('smc_monitored_symbol');
+            if (savedSymbol) {
+                document.getElementById('symbolInput').value = savedSymbol;
+                initiateAnalysis(savedSymbol);
+            }
+        });
+
+        function handleSymbolChange() {
+            const symbolInput = document.getElementById('symbolInput').value.trim().toUpperCase();
+            if (!symbolInput) return;
+            localStorage.setItem('smc_monitored_symbol', symbolInput);
+            initiateAnalysis(symbolInput);
+        }
+
+        function initiateAnalysis(symbol) {
+            clearInterval(refreshInterval);
+            clearInterval(countdownInterval);
+
+            fetchSMCData(symbol);
+            startCountdown();
+
+            // 设定每 5 分钟定时刷新
+            refreshInterval = setInterval(() => {
+                fetchSMCData(symbol);
+                startCountdown();
+            }, REFRESH_TIME * 1000);
+        }
+
+        function startCountdown() {
+            let timeLeft = REFRESH_TIME;
+            const countdownEl = document.getElementById('countdown');
+
+            clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+                const secs = String(timeLeft % 60).padStart(2, '0');
+                countdownEl.textContent = `${mins}:${secs}`;
+
+                if (timeLeft <= 0) clearInterval(countdownInterval);
+            }, 1000);
+        }
+
+        async function fetchSMCData(symbol) {
+            const loader = document.getElementById('loader');
+            const content = document.getElementById('dashboardContent');
+
+            loader.classList.remove('hidden');
+            content.classList.add('hidden');
+
+            try {
+                // 采用 15分钟(15min) K线进行高精度波段解构
+                const url = `https://api.twelvedata.com/time_series?symbol=${symbol}&interval=15min&outputsize=20&apikey=${TWELVE_DATA_API_KEY}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.status === 'error' || !data.values) {
+                    alert(`Symbol [${symbol}] fetch failed. Verification required.`);
+                    loader.classList.add('hidden');
+                    return;
+                }
+
+                renderSMCEngine(data.values);
+
+                loader.classList.add('hidden');
+                content.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                alert("Network communication disruption with Twelve Data Engine.");
+                loader.classList.add('hidden');
+            }
+        }
+
+        function renderSMCEngine(candles) {
+            // 解析数据层（数值格式化）
+            const parsed = candles.map(c => ({
+                open: parseFloat(c.open),
+                high: parseFloat(c.high),
+                low: parseFloat(c.low),
+                close: parseFloat(c.close),
+                volume: parseInt(c.volume)
+            })).reverse(); // 调转数组，使其按时间正序排列
+
+            const current = parsed[parsed.length - 1];
+            const prev = parsed[parsed.length - 2];
+            const pprev = parsed[parsed.length - 3];
+
+            // 1. 映射标准价格面板
+            document.getElementById('lastPrice').textContent = `$${current.close.toFixed(2)}`;
+            const rawVol = parsed.reduce((sum, c) => sum + c.volume, 0) / parsed.length;
+            document.getElementById('marketVolume').textContent = rawVol > 1000000 ? `${(rawVol / 1000000).toFixed(2)}M` : `${(rawVol / 1000).toFixed(0)}K`;
+
+            // 2. 模拟高级趋势结构（通过 15 周期数学包络线替代大趋势 EMA）
+            const ma = parsed.reduce((sum, c) => sum + c.close, 0) / parsed.length;
+            const isBullishBias = current.close > ma;
+
+            const biasEl = document.getElementById('marketBias');
+            biasEl.textContent = isBullishBias ? 'BULLISH STRUCTURE' : 'BEARISH STRUCTURE';
+            biasEl.className = isBullishBias ? 'inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5 bg-emerald-950 text-emerald-400 border border-emerald-800' : 'inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5 bg-rose-950 text-rose-400 border border-rose-800';
+
+            // 3. 计算实时 Heikin-Ashi 转换（降噪验证）
+            const haClose = (current.open + current.high + current.low + current.close) / 4;
+            const haOpen = (prev.open + prev.close) / 2;
+            const isHaGreen = haClose > haOpen;
+
+            const haStateEl = document.getElementById('haState');
+            haStateEl.textContent = isHaGreen ? 'HA BULLISH (GREEN)' : 'HA BEARISH (RED)';
+            haStateEl.className = isHaGreen ? 'inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5 bg-emerald-950 text-emerald-400 border border-emerald-800' : 'inline-block text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider mt-1.5 bg-rose-950 text-rose-400 border border-rose-800';
+
+            // 4. 计算实时市场公允价值差 (FVG)
+            let fvgPrice = "MITIGATED (NONE)";
+            let hasBullishFVG = pprev.high < current.low;
+            let hasBearishFVG = pprev.low > current.high;
+
+            if (hasBullishFVG) {
+                fvgPrice = `$${pprev.high.toFixed(2)} - $${current.low.toFixed(2)}`;
+            } else if (hasBearishFVG) {
+                fvgPrice = `$${current.high.toFixed(2)} - $${pprev.low.toFixed(2)}`;
+            }
+            document.getElementById('paramFVG').textContent = fvgPrice;
+
+            // 5. 生成专业智能交易矩阵建议
+            const actionBadge = document.getElementById('actionBadge');
+            const actionReasoning = document.getElementById('actionReasoning');
+
+            let entryPrice, slPrice;
+
+            if (isBullishBias) {
+                // 做多矩阵：回踩最后拉升前的阴线（模拟低位 Order Block）
+                entryPrice = Math.min(prev.open, prev.close) * 0.998;
+                slPrice = Math.min(...parsed.slice(-5).map(c => c.low)) * 0.995; // 放在前5根K线流动的低点下方
+
+                document.getElementById('paramEntry').textContent = `$${entryPrice.toFixed(2)}`;
+                document.getElementById('paramSL').textContent = `$${slPrice.toFixed(2)}`;
+
+                if (isHaGreen && hasBullishFVG) {
+                    actionBadge.textContent = "STRONG BUY / LIMIT";
+                    actionBadge.className = "text-center py-4 rounded-xl text-lg font-black tracking-widest uppercase mb-4 bg-emerald-950 text-emerald-400 border border-emerald-700";
+                    actionReasoning.textContent = "Market Structure is firmly Bullish. High-velocity FVG discovered inside discount zone. Heikin-Ashi confirms intense institutional accumulation momentum. Set Limit Orders near Order Block.";
+                } else {
+                    actionBadge.textContent = "MONITOR / RETRACE";
+                    actionBadge.className = "text-center py-4 rounded-xl text-lg font-black tracking-widest uppercase mb-4 bg-amber-950 text-amber-400 border border-amber-700";
+                    actionReasoning.textContent = "Structure bias remains positive, but lower timeframe exhibits temporary exhaustion or lacks clear institutional imbalance. Await sweep of internal liquidity pools prior to execution.";
+                }
+            } else {
+                // 做空矩阵
+                entryPrice = Math.max(prev.open, prev.close) * 1.002;
+                slPrice = Math.max(...parsed.slice(-5).map(c => c.high)) * 1.005;
+
+                document.getElementById('paramEntry').textContent = `$${entryPrice.toFixed(2)}`;
+                document.getElementById('paramSL').textContent = `$${slPrice.toFixed(2)}`;
+
+                if (!isHaGreen && hasBearishFVG) {
+                    actionBadge.textContent = "STRONG SHORT / LIMIT";
+                    actionBadge.className = "text-center py-4 rounded-xl text-lg font-black tracking-widest uppercase mb-4 bg-rose-950 text-rose-400 border border-rose-700";
+                    actionReasoning.textContent = "Market Structure has fractured into Bearish expansion. Bearish FVG is left unfilled above. Heikin-Ashi registers clear distribution cells. Deploy short inventory on premium pullback.";
+                } else {
+                    actionBadge.textContent = "MONITOR / CONSOLIDATE";
+                    actionBadge.className = "text-center py-4 rounded-xl text-lg font-black tracking-widest uppercase mb-4 bg-amber-950 text-amber-400 border border-amber-700";
+                    actionReasoning.textContent = "Bearish macro flow detected, but compression range is tightly bound. Avoid chase entries. Exercise patience until premium mitigation occurs near institutional blocks.";
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
