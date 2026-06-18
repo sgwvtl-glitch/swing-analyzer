@@ -261,6 +261,21 @@
       transition: all 0.2s ease;
     }
 
+    .detail-quote {
+      background: rgba(255, 255, 255, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      border-radius: 14px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 13px;
+      font-style: italic;
+      color: #475569;
+      text-align: center;
+      line-height: 1.6;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    }
+
     .sig-long {
       background: #f0fdf4;
       border-color: #bbf7d0;
@@ -435,6 +450,12 @@
       .sig-none {
         background: rgba(51, 65, 85, 0.2);
         border-color: #475569;
+      }
+
+      .detail-quote {
+        background: rgba(30, 41, 59, 0.6);
+        border-color: rgba(51, 65, 85, 0.8);
+        color: #94a3b8;
       }
 
       .sig-long .sv {
@@ -839,6 +860,7 @@
         f1, f1r, f2, f2r, f3, f3r, f4, f4r, f5, f5r, score, infFlow, haBody: haBody.toFixed(3),
         signal, sigClass, a5: a5[L], a13: a13[L], bbwState: bbwExp ? 'expanding' : 'contracting',
         hHA, hRSI, hOBV, hEFIDir, entryReady, ticker, date: dBars[L].date.toLocaleDateString(),
+        dayOpen: dBars[L].o, dayHigh: dBars[L].h, dayLow: dBars[L].l, dayVol: dBars[L].v,
         macroPass, macroReason, spyAbove, qqqAbove, vixOk,
         spyPrice: macro ? macro.spyPrice : null, spyEMA: macro ? macro.spyEMA : null,
         qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA : null,
@@ -874,6 +896,16 @@
       const sigW = r.curSig != null ? '&plusmn;' + fmtE(2 * r.curSig) : 'n/a';
       
       document.getElementById('res').innerHTML =
+        (r.smc15m ? '<div class="detail-quote">' +
+          '<div style="font-size:24px; font-weight:700; margin-bottom:4px; color:inherit; letter-spacing:-0.02em">$' + r.smc15m.lastPrice.toFixed(2) + '</div>' +
+          '<div style="display:flex; justify-content:center; gap:12px; margin-bottom:12px; font-size:11px; opacity:0.8; text-transform:uppercase; font-weight:600; letter-spacing:0.03em">' +
+            '<span>O: $' + r.dayOpen.toFixed(2) + '</span>' +
+            '<span>H: $' + r.dayHigh.toFixed(2) + '</span>' +
+            '<span>L: $' + r.dayLow.toFixed(2) + '</span>' +
+            '<span>V: ' + fmtE(r.dayVol) + '</span>' +
+          '</div>' +
+          (r.smc15m.actionReasoning ? '<div style="opacity:0.9; line-height:1.5">' + r.smc15m.actionReasoning + '</div>' : '') +
+        '</div>' : '') +
         '<div class="sig ' + r.sigClass + '" id="sig-card">' +
           '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
           '<div class="sv">' + r.signal + '</div>' +
