@@ -571,14 +571,32 @@
 
     async function fetchMacro(stEl) {
       if (stEl) stEl.textContent = 'Fetching macro data...';
-      const B = 'https://api.twelvedata.com';
-      async function px(sym) { const r = await fetch(B + '/price?symbol=' + sym + '&apikey=' + TD_KEY); const d = await r.json(); if (!d.price) throw new Error(sym); return parseFloat(d.price); }
-      async function em(sym, n) { const r = await fetch(B + '/ema?symbol=' + sym + '&interval=1day&time_period=' + n + '&outputsize=1&apikey=' + TD_KEY); const d = await r.json(); if (!d.values || !d.values[0]) throw new Error(sym + ' ema'); return parseFloat(d.values[0].ema); }
-      let sp = null, se = null, qp = null, qe = null, vix = null;
-      try { [sp, se] = await Promise.all([px('SPY'), em('SPY', 21)]); } catch (e) { }
-      try { [qp, qe] = await Promise.all([px('QQQ'), em('QQQ', 21)]); } catch (e) { }
+
+      async function getIndexData(sym) {
+        const bars = await fetchTD(sym, '1d', 100);
+        const closes = bars.map(b => b.c);
+        const e21 = ema(closes, 21);
+        const e55 = ema(closes, 55);
+        return {
+          price: closes[closes.length - 1],
+          ema21: e21[e21.length - 1],
+          ema55: e55[e55.length - 1]
+        };
+      }
+
+      let spy = null, qqq = null, iwm = null, dia = null, vix = null;
+      try { spy = await getIndexData('SPY'); } catch (e) { }
+      try { qqq = await getIndexData('QQQ'); } catch (e) { }
+      try { iwm = await getIndexData('IWM'); } catch (e) { }
+      try { dia = await getIndexData('DIA'); } catch (e) { }
       try { const v = await fetchVIX(); vix = v.price; } catch (e) { }
-      return { spyPrice: sp, spyEMA: se, qqqPrice: qp, qqqEMA: qe, vix };
+      return {
+        spyPrice: spy?.price, spyEMA21: spy?.ema21, spyEMA55: spy?.ema55,
+        qqqPrice: qqq?.price, qqqEMA21: qqq?.ema21, qqqEMA55: qqq?.ema55,
+        iwmPrice: iwm?.price, iwmEMA21: iwm?.ema21,
+        diaPrice: dia?.price, diaEMA21: dia?.ema21,
+        vix
+      };
     }
 
     function ema(a, n) { const k = 2 / (n + 1), o = new Array(a.length).fill(null); let f = -1; for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; if (f < 0) { o[i] = a[i]; f = i; continue; } if (o[i - 1] != null) o[i] = a[i] * k + o[i - 1] * (1 - k); } return o; }
@@ -655,19 +673,42 @@
 
       const curP = bars[n - 1].c;
       let poi = 'none';
+      let poiBounds = { top: null, bot: null };
       let breakdown = { structure: 0, ob: 0, fvg: 0 };
 
       if (structure === 'bullish') {
         breakdown.structure = 1;
-        if (obs.some(o => o.type === 'bull' && curP >= o.bot && curP <= o.top)) { poi = 'Bullish OB'; breakdown.ob = 3; }
-        else if (fvgs.some(f => f.type === 'bull' && curP >= f.bot && curP <= f.top)) { poi = 'Bullish FVG'; breakdown.fvg = 1; }
+        const obMatch = obs.find(o => o.type === 'bull' && curP >= o.bot && curP <= o.top);
+        if (obMatch) {
+          poi = 'Bullish OB';
+          breakdown.ob = 3;
+          poiBounds = { top: obMatch.top, bot: obMatch.bot };
+        } else {
+          const fvgMatch = fvgs.find(f => f.type === 'bull' && curP >= f.bot && curP <= f.top);
+          if (fvgMatch) {
+            poi = 'Bullish FVG';
+            breakdown.fvg = 1;
+            poiBounds = { top: fvgMatch.top, bot: fvgMatch.bot };
+          }
+        }
       } else if (structure === 'bearish') {
         breakdown.structure = -1;
-        if (obs.some(o => o.type === 'bear' && curP >= o.bot && curP <= o.top)) { poi = 'Bearish OB'; breakdown.ob = -3; }
-        else if (fvgs.some(f => f.type === 'bear' && curP >= f.bot && curP <= f.top)) { poi = 'Bearish FVG'; breakdown.fvg = -1; }
+        const obMatch = obs.find(o => o.type === 'bear' && curP >= o.bot && curP <= o.top);
+        if (obMatch) {
+          poi = 'Bearish OB';
+          breakdown.ob = -3;
+          poiBounds = { top: obMatch.top, bot: obMatch.bot };
+        } else {
+          const fvgMatch = fvgs.find(f => f.type === 'bear' && curP >= f.bot && curP <= f.top);
+          if (fvgMatch) {
+            poi = 'Bearish FVG';
+            breakdown.fvg = -1;
+            poiBounds = { top: fvgMatch.top, bot: fvgMatch.bot };
+          }
+        }
       }
 
-      return { structure, lastEvent, poi, breakdown };
+      return { structure, lastEvent, poi, poiBounds, breakdown };
     }
 
     function get15MSMC(candles) {
@@ -758,6 +799,10 @@
       const { h: mH } = macd(closes, 13, 21, 8);
       const bw = bbw(closes, 21);
       const adxV = adx(dBars, 13);
+      const e21 = ema(closes, 21);
+      const e55 = ema(closes, 55);
+      const trendLong = closes[L] > e21[L] && e21[L] > e55[L];
+      const trendShort = closes[L] < e21[L] && e21[L] < e55[L];
       const obvSlope = ob[L] > ob[L - 3] ? 'rising' : ob[L] < ob[L - 3] ? 'falling' : 'flat';
       const curBBW = bw[L], prvBBW = bw[L - 1];
       const bbwExp = curBBW != null && prvBBW != null && curBBW > prvBBW;
@@ -820,40 +865,77 @@
       const smc = getSMC(dBars);
       const smc15m = get15MSMC(min15);
       let score = f1 + f2 + f3 + f4 + f5 + smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
+          if (flowMixed) score -= 1;
 
-    if (flowMixed) score -= 1;
-      const haBar = haD[L];
-      const haBody = haBar ? Math.abs(haBar.hc - haBar.ho) / (haBar.hh - haBar.hl || 0.0001) : 0;
-      const infFlow = haBody > 0.618 && a5[L] != null && Math.abs(dBars[L].c - dBars[L - 1].c) > a5[L];
-      if (infFlow) regMult = Math.min(regMult, 0.618);
-      let signal, sigClass;
-      if (flow !== 'CLEAN') { signal = 'NO TRADE — ' + flow; sigClass = 'sig-none'; }
-      else if (score >= 4) { signal = score >= 7 ? 'LONG — full position' : 'LONG — reduced position'; sigClass = 'sig-long'; }
-      else if (score <= -4) { signal = score <= -7 ? 'SHORT — full position' : 'SHORT — reduced position'; sigClass = 'sig-short'; }
-      else { signal = 'NO TRADE — wait for alignment'; sigClass = 'sig-none'; }
-      const aligned = (signal.includes('LONG') && hHA === 'bullish') || (signal.includes('SHORT') && hHA === 'bearish');
-      const rsiOK = (signal.includes('LONG') && hRSI != null && hRSI > 55) || (signal.includes('SHORT') && hRSI != null && hRSI < 45);
-      const obvOK = (signal.includes('LONG') && hOBV === 'rising') || (signal.includes('SHORT') && hOBV === 'falling');
-      const entryReady = aligned && rsiOK && obvOK;
-      var macroPass = true, macroReason = '', spyAbove = null, qqqAbove = null, vixOk = null;
-      if (macro) {
-        spyAbove = macro.spyPrice != null && macro.spyEMA != null ? macro.spyPrice > macro.spyEMA : null;
-        qqqAbove = macro.qqqPrice != null && macro.qqqEMA != null ? macro.qqqPrice > macro.qqqEMA : null;
-        var isLong = score >= 4, isShort = score <= -4;
-        if (isLong) {
-          vixOk = macro.vix != null ? macro.vix < 25 : null;
-          var pts = (spyAbove === true ? 1 : 0) + (qqqAbove === true ? 1 : 0) + (vixOk === true ? 1 : 0);
-          if (pts < 2) { macroPass = false; macroReason = 'Macro does not support long'; }
-        } else if (isShort) {
-          vixOk = macro.vix != null ? macro.vix > 20 : null;
-          var pts2 = (spyAbove === false ? 1 : 0) + (qqqAbove === false ? 1 : 0) + (vixOk === true ? 1 : 0);
-          if (pts2 < 2) { macroPass = false; macroReason = 'Macro does not support short'; }
-        } else { vixOk = macro.vix != null ? macro.vix < 25 : null; }
-        if (!macroPass) { signal = 'NO TRADE — macro blocked'; sigClass = 'sig-none'; }
+      const bias = score >= 4 ? 'LONG' : score <= -4 ? 'SHORT' : 'NEUTRAL';
+      const gates = new Array(6).fill('FAIL');
+      let passCount = 0;
+
+      if (bias !== 'NEUTRAL') {
+        const isLong = bias === 'LONG';
+        if (macro) {
+          if (isLong ? (macro.spyPrice > macro.spyEMA21 && macro.spyEMA21 > macro.spyEMA55 && macro.qqqPrice > macro.qqqEMA21 && macro.qqqEMA21 > macro.qqqEMA55) : (macro.spyPrice < macro.spyEMA21 && macro.spyEMA21 < macro.spyEMA55 && macro.qqqPrice < macro.qqqEMA21 && macro.qqqEMA21 < macro.qqqEMA55)) { gates[0] = 'PASS'; passCount++; }
+          const breadthC = [
+            (macro.spyPrice > macro.spyEMA21), (macro.qqqPrice > macro.qqqEMA21),
+            (macro.iwmPrice > macro.iwmEMA21), (macro.diaPrice > macro.diaEMA21)
+          ].filter(Boolean).length;
+          if (breadthC >= 3) { gates[1] = 'PASS'; passCount++; } else if (breadthC === 2) { gates[1] = 'CAUTION'; }
+        }
+        if (isLong ? (smc.structure === 'bullish' && smc.lastEvent === 'BOS') : (smc.structure === 'bearish' && smc.lastEvent === 'BOS')) { gates[2] = 'PASS'; passCount++; }
+        else if (smc.lastEvent === 'CHoCH') { gates[2] = 'FAIL'; }
+        if (isLong ? (curEFI > 0 || obvSlope === 'rising') : (curEFI < 0 || obvSlope === 'falling')) { gates[3] = 'PASS'; passCount++; }
+        const p = dBars[L].c, b = smc.poiBounds;
+        if (b.top != null && b.bot != null) {
+          const dist = (p >= b.bot && p <= b.top) ? 0 : Math.min(Math.abs(p - b.top), Math.abs(p - b.bot));
+          if (dist <= 0.5 * a13[L]) { gates[4] = 'PASS'; passCount++; }
+        }
+        const target = isLong ? Math.max(...dBars.slice(Math.max(0, L - 21), L + 1).map(x => x.h)) : Math.min(...dBars.slice(Math.max(0, L - 21), L + 1).map(x => x.l));
+        const stop = isLong ? (smc15m ? smc15m.slPrice : Math.min(...dBars.slice(Math.max(0, L - 5), L + 1).map(x => x.l))) : (smc15m ? smc15m.entryPrice : Math.max(...dBars.slice(Math.max(0, L - 5), L + 1).map(x => x.h)));
+        if (Math.abs(target - p) / Math.abs(p - stop) >= 2) { gates[5] = 'PASS'; passCount++; }
       }
+
+      let grade = 'D', risk = '0%';
+      if (passCount === 6) { grade = 'A'; risk = '1%'; }
+      else if (passCount === 5) { grade = 'B'; risk = '0.5%'; }
+      else if (passCount === 4) { grade = 'C'; risk = 'Watchlist'; }
+      else { grade = 'D'; risk = 'NO TRADE'; }
+
+      let signal = 'D SETUP — NO TRADE', sigClass = 'sig-none';
+      if (grade === 'A') { signal = 'A SETUP — ' + bias; sigClass = 'sig-long'; }
+      else if (grade === 'B') { signal = 'B SETUP — ' + bias; sigClass = 'sig-long'; }
+      else if (grade === 'C') { signal = 'C SETUP — Watchlist'; sigClass = 'sig-none'; }
+      else { signal = 'D SETUP — NO TRADE'; sigClass = 'sig-none'; }
+      if (bias === 'SHORT' && grade !== 'D') sigClass = 'sig-short';
 
       const volState = volRatio > 1.5 ? 'High' : volRatio < 0.7 ? 'Low' : 'Normal';
       const volAnalysis = `${volState} Vol / ${obvSlope} OBV`;
+
+      const range = haD[L].hh - haD[L].hl;
+      const haBody = range === 0 ? 0 : (haD[L].hc - haD[L].ho) / range;
+      const infFlow = haBody > 0.618 && a5[L] != null && Math.abs(dBars[L].c - dBars[L - 1].c) > a5[L];
+      const macroPass = (bias !== 'NEUTRAL') ? (gates[0] === 'PASS' && gates[1] === 'PASS') : true;
+      let macroReason = null;
+      if (bias !== 'NEUTRAL') {
+        if (gates[0] === 'FAIL') macroReason = 'Macro trend mismatch (SPY/QQQ)';
+        else if (gates[1] === 'FAIL') macroReason = 'Insufficient market breadth';
+        else if (gates[1] === 'CAUTION') macroReason = 'Caution: Breadth is mixed';
+      }
+      const vixOk = macro && macro.vix !== null ? macro.vix < 25 : true;
+      const spyBull = macro ? macro.spyPrice > macro.spyEMA21 : null;
+      const spyBear = macro ? macro.spyPrice < macro.spyEMA21 : null;
+      const qqqBull = macro ? macro.qqqPrice > macro.qqqEMA21 : null;
+      const qqqBear = macro ? macro.qqqPrice < macro.qqqEMA21 : null;
+      let entryReady = false;
+      if (hHA !== 'n/a') {
+        if (bias === 'LONG' && hHA === 'bullish' && hRSI < 70) entryReady = true;
+        if (bias === 'SHORT' && hHA === 'bearish' && hRSI > 30) entryReady = true;
+      }
+
+      // For render compatibility: simplify bull/bear to above/below based on bias
+      const isLongBias = score >= 4;
+      const isShortBias = score <= -4;
+      const spyAbove = isLongBias ? spyBull : isShortBias ? spyBear : null;
+      const qqqAbove = isLongBias ? qqqBull : isShortBias ? qqqBear : null;
 
       return {
         regime, regAct, regMult, curAr, curBBW, bbwExp, flow, flowMixed, curEFI, curMu, curSig,
@@ -862,8 +944,8 @@
         hHA, hRSI, hOBV, hEFIDir, entryReady, ticker, date: dBars[L].date.toLocaleDateString(),
         dayOpen: dBars[L].o, dayHigh: dBars[L].h, dayLow: dBars[L].l, dayVol: dBars[L].v,
         macroPass, macroReason, spyAbove, qqqAbove, vixOk,
-        spyPrice: macro ? macro.spyPrice : null, spyEMA: macro ? macro.spyEMA : null,
-        qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA : null,
+        spyPrice: macro ? macro.spyPrice : null, spyEMA: macro ? macro.spyEMA21 : null,
+        qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA21 : null,
         vix: macro ? macro.vix : null,
         volAnalysis, smc,
         smc15m
@@ -928,16 +1010,13 @@
             
             // Step 3 - Alpha Score Card
             '<div class="card" id="card-step3">' +
-              '<div class="s-title">3 &middot; Alpha score</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MFI(13) + OBV</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f1r + '</span>' + fb(r.f1) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">MACD(13,21,8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f2r + '</span>' + fb(r.f2) + '</div>' +
+              '<div class="s-title">3 &middot; Confluence</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
               '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
-              '<div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span style="font-size:14px;font-weight:600">Total Score</span>' + sb(r.score) + (r.flowMixed ? '<span style="font-size:11px;color:#b45309;font-weight:500">(-1 for mixed flow)</span>' : '') + '</div>' +
             '</div>' +
             (r.smc15m ?
             '<div class="card" id="card-step8">' +
