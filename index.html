@@ -138,7 +138,8 @@
       align-items: start;
     }
 
-    .col-left, .col-right {
+    .col-left,
+    .col-right {
       display: flex;
       flex-direction: column;
     }
@@ -160,26 +161,53 @@
         flex-direction: column;
         gap: 1.25rem;
       }
-      .col-left, .col-right {
+
+      .col-left,
+      .col-right {
         display: contents;
       }
-      #sig-card { order: 1; }
-      #card-step0 { order: 2; }
-      #card-step1 { order: 3; }
-      #card-step2 { order: 4; }
-      #card-step3 { order: 5; }
-      #grid-steps-4-7 { order: 6; }
-      #card-step8 { order: 7; }
+
+      #sig-card {
+        order: 1;
+      }
+
+      #card-step0 {
+        order: 2;
+      }
+
+      #card-step1 {
+        order: 3;
+      }
+
+      #card-step2 {
+        order: 4;
+      }
+
+      #card-step3 {
+        order: 5;
+      }
+
+      #grid-steps-4-7 {
+        order: 6;
+      }
+
+      #card-step8 {
+        order: 7;
+      }
+
       body {
         padding: 1rem;
       }
+
       input[type=text] {
         width: 100%;
       }
+
       .row {
         flex-direction: column;
         align-items: stretch !important;
       }
+
       button {
         width: 100%;
       }
@@ -343,7 +371,7 @@
       background: rgba(255, 255, 255, 0.9);
       backdrop-filter: blur(8px);
       border-top: 1px solid #e2e8f0;
-      box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
+      box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.03);
       color: #475569
     }
 
@@ -482,7 +510,7 @@
       #timer-bar {
         background: rgba(30, 41, 59, 0.9);
         border-color: #334155;
-        box-shadow: 0 -4px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2);
         color: #cbd5e1
       }
     }
@@ -560,7 +588,7 @@
     }
 
     async function fetchVIX() {
-      const PROXY_URL = 'https://vix-proxy.onrender.com//vix';
+      const PROXY_URL = 'https://vix-proxy.onrender.com/vix';
       const r = await fetch(PROXY_URL, { signal: AbortSignal.timeout(10000) });
       if (!r.ok) throw new Error(`Proxy HTTP ${r.status}`);
       const j = await r.json();
@@ -606,7 +634,7 @@
     function rStd(a, n) { const o = new Array(a.length).fill(null); for (let i = n - 1; i < a.length; i++) { const sl = a.slice(i - n + 1, i + 1).filter(x => x != null); if (sl.length < n) continue; const m = sl.reduce((a, b) => a + b, 0) / sl.length; o[i] = Math.sqrt(sl.reduce((a, b) => a + (b - m) ** 2, 0) / sl.length); } return o; }
     function ha(bars) { const r = []; for (let i = 0; i < bars.length; i++) { const b = bars[i]; const hc = (b.o + b.h + b.l + b.c) / 4; const ho = i === 0 ? (b.o + b.c) / 2 : (r[i - 1].ho + r[i - 1].hc) / 2; r.push({ ...b, ho, hh: Math.max(b.h, ho, hc), hl: Math.min(b.l, ho, hc), hc }); } return r; }
     function atr(bars, n) { const tr = bars.map((b, i) => { if (i === 0) return b.h - b.l; const p = bars[i - 1].c; return Math.max(b.h - b.l, Math.abs(b.h - p), Math.abs(b.l - p)); }); return wilder(tr, n); }
-    function mfi(bars, n) { const o = new Array(bars.length).fill(null); for (let i = n; i < bars.length; i++) { let pf = 0, nf = 0; for (let j = i - n + 1; j <= i; j++) { const tp = (bars[j].h + bars[j].l + bars[j].c) / 3, pt = (bars[j - 1].h + bars[j - 1].l + bars[j - 1].c) / 3; const rmf = tp * bars[j].v; if (tp >= pt) pf += rmf; else nf += rmf; } o[i] = nf === 0 ? 100 : 100 - 100 / (1 + pf / nf); } return o; }
+    function mfi(bars, n) { const o = new Array(bars.length).fill(null); for (let i = n - 1; i < bars.length; i++) { let pf = 0, nf = 0; for (let j = i - n + 1; j <= i; j++) { const prevIdx = Math.max(j - 1, 0); const tp = (bars[j].h + bars[j].l + bars[j].c) / 3, pt = (bars[prevIdx].h + bars[prevIdx].l + bars[prevIdx].c) / 3; const rmf = tp * bars[j].v; if (tp >= pt) pf += rmf; else nf += rmf; } o[i] = nf === 0 ? 100 : 100 - 100 / (1 + pf / nf); } return o; }
     function obv(bars) { const o = new Array(bars.length).fill(0); for (let i = 1; i < bars.length; i++) { if (bars[i].c > bars[i - 1].c) o[i] = o[i - 1] + bars[i].v; else if (bars[i].c < bars[i - 1].c) o[i] = o[i - 1] - bars[i].v; else o[i] = o[i - 1]; } return o; }
     function efi(bars, en, sn) { const raw = bars.map((b, i) => i === 0 ? 0 : (b.c - bars[i - 1].c) * b.v); const e = ema(raw, en); const mu = sma(e, sn); const sig = rStd(e, sn); return { e, mu, sig }; }
     function rsi(closes, n) { const g = [], l = []; for (let i = 1; i < closes.length; i++) { const d = closes[i] - closes[i - 1]; g.push(Math.max(d, 0)); l.push(Math.max(-d, 0)); } const ag = wilder(g, n), al = wilder(l, n); const o = [null]; for (let i = 0; i < ag.length; i++) { if (ag[i] == null) { o.push(null); continue; } o.push(al[i] === 0 ? 100 : 100 - 100 / (1 + ag[i] / al[i])); } return o; }
@@ -868,7 +896,7 @@
       const smc = getSMC(dBars);
       const smc15m = get15MSMC(min15);
       let score = f1 + f2 + f3 + f4 + f5 + smc.breakdown.structure + smc.breakdown.ob + smc.breakdown.fvg;
-          if (flowMixed) score -= 1;
+      if (flowMixed) score -= 1;
 
       const bias = score >= 4 ? 'LONG' : score <= -4 ? 'SHORT' : 'NEUTRAL';
 
@@ -1017,144 +1045,144 @@
       const entTxt = r.entryReady ? 'READY' : r.hHA === 'n/a' ? 'NO 1H DATA' : 'PENDING';
       const infC = r.infFlow ? 'bw' : 'bg';
       const sigW = r.curSig != null ? '&plusmn;' + fmtE(2 * r.curSig) : 'n/a';
-      
+
       document.getElementById('res').innerHTML =
         (r.smc15m ? '<div class="detail-quote">' +
           '<div style="font-size:24px; font-weight:700; margin-bottom:4px; color:inherit; letter-spacing:-0.02em">$' + r.smc15m.lastPrice.toFixed(2) + '</div>' +
           '<div style="display:flex; justify-content:center; gap:12px; margin-bottom:12px; font-size:11px; opacity:0.8; text-transform:uppercase; font-weight:600; letter-spacing:0.03em">' +
-            '<span>O: $' + r.dayOpen.toFixed(2) + '</span>' +
-            '<span>H: $' + r.dayHigh.toFixed(2) + '</span>' +
-            '<span>L: $' + r.dayLow.toFixed(2) + '</span>' +
-            '<span>V: ' + fmtE(r.dayVol) + '</span>' +
+          '<span>O: $' + r.dayOpen.toFixed(2) + '</span>' +
+          '<span>H: $' + r.dayHigh.toFixed(2) + '</span>' +
+          '<span>L: $' + r.dayLow.toFixed(2) + '</span>' +
+          '<span>V: ' + fmtE(r.dayVol) + '</span>' +
           '</div>' +
           (r.smc15m.actionReasoning ? '<div style="opacity:0.9; line-height:1.5">' + r.smc15m.actionReasoning + '</div>' : '') +
-        '</div>' : '') +
+          '</div>' : '') +
         '<div class="sig ' + r.sigClass + '" id="sig-card">' +
-          '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
-          '<div class="sv">' + r.signal + '</div>' +
+        '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
+        '<div class="sv">' + r.signal + '</div>' +
         '</div>' +
         '<div class="card" style="margin-bottom:1.25rem">' +
-          '<div class="s-title">Execution Gates Checklist</div>' +
-          '<div class="g3" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr))">' +
-            [
-              'Market Regime', 'Market Breadth', 'SMC Structure', 'EFI/OBV', 'POI Prox', 'Risk/Reward'
-            ].map((name, i) => {
-              const res = r.gates[i];
-              return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
-               '<span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600">' + name + '</span>' +
-               b(res, res === 'PASS' ? 'bg' : res === 'CAUTION' ? 'bw' : 'br') +
-               '</div>';
-            }).join('') +
-          '</div>' +
+        '<div class="s-title">Execution Gates Checklist</div>' +
+        '<div class="g3" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr))">' +
+        [
+          'Market Regime', 'Market Breadth', 'SMC Structure', 'EFI/OBV', 'POI Prox', 'Risk/Reward'
+        ].map((name, i) => {
+          const res = r.gates[i];
+          return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+            '<span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600">' + name + '</span>' +
+            b(res, res === 'PASS' ? 'bg' : res === 'CAUTION' ? 'bw' : 'br') +
+            '</div>';
+        }).join('') +
+        '</div>' +
         '</div>' +
         '<div class="dashboard-grid">' +
-          '<div class="col-left">' +
-            // Step 0 - Macro Gate Card
-            '<div class="card" id="card-step0">' +
-              '<div class="s-title">S&middot; Macro Analysis</div>' +
-              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-                b(r.vixOk ? 'VIX Stable' : 'VIX Elevated', r.vixOk ? 'bg' : 'bw') +
-              '</div>' +
-              '<div class="g3">' +
-                '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' +
-                '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' +
-                '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' +
-              '</div>' +
-              (r.breadthChecks ? '<div style="margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9">' +
-                '<div class="lbl" style="margin-bottom:6px">Market Breadth (EMA55)</div>' +
-                '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-                  r.breadthChecks.map(c => b(c.name, c.pass ? 'bg' : 'br')).join('') +
-                '</div>' +
-              '</div>' : '') +
-            '</div>' +
+        '<div class="col-left">' +
+        // Step 0 - Macro Gate Card
+        '<div class="card" id="card-step0">' +
+        '<div class="s-title">S&middot; Macro Analysis</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+        b(r.vixOk ? 'VIX Stable' : 'VIX Elevated', r.vixOk ? 'bg' : 'bw') +
+        '</div>' +
+        '<div class="g3">' +
+        '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' +
+        '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' +
+        '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' +
+        '</div>' +
+        (r.breadthChecks ? '<div style="margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9">' +
+          '<div class="lbl" style="margin-bottom:6px">Market Breadth (EMA55)</div>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          r.breadthChecks.map(c => b(c.name, c.pass ? 'bg' : 'br')).join('') +
+          '</div>' +
+          '</div>' : '') +
+        '</div>' +
 
-            // Step 3 - Alpha Score Card
-            '<div class="card" id="card-step3">' +
-              '<div class="s-title">3 &middot; Confluence</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
-              '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
-            '</div>' +
-            (r.smc15m ?
-            '<div class="card" id="card-step8">' +
-              '<div class="s-title">Step 8 &middot; 15M SMC Confluence</div>' +
-              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-                b(r.smc15m.action, r.smc15m.actionClass === 'sig-long' ? 'bg' : r.smc15m.actionClass === 'sig-short' ? 'br' : 'bn') +
-                b(r.smc15m.biasText, r.smc15m.isBullishBias ? 'bg' : 'br') +
-                b(r.smc15m.haText, r.smc15m.isHaGreen ? 'bg' : 'br') +
-              '</div>' +
-              '<div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:12px">' + r.smc15m.actionReasoning + '</div>' +
-              '<div class="g3">' +
-                '<div><div class="lbl">OB Entry Price</div><div class="val" style="font-weight:600">$' + r.smc15m.entryPrice.toFixed(2) + '</div></div>' +
-                '<div><div class="lbl">Invalidation (SL)</div><div class="val" style="font-weight:600">$' + r.smc15m.slPrice.toFixed(2) + '</div></div>' +
-                '<div><div class="lbl">FVG Imbalance</div><div class="val" style="font-size:11px">' + r.smc15m.fvgPrice + '</div></div>' +
-              '</div>' +
-            '</div>' : '') +
+        // Step 3 - Alpha Score Card
+        '<div class="card" id="card-step3">' +
+        '<div class="s-title">3 &middot; Confluence</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">RSI(8)</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f3r + '</span>' + fb(r.f3) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">EFI Momentum</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f4r + '</span>' + fb(r.f4) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">Vol Confirm</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + r.f5r + '</span>' + fb(r.f5) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Structure</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.structure === 'bullish' ? 'Bullish' : r.smc.structure === 'bearish' ? 'Bearish' : 'Neutral') + '</span>' + sb(r.smc.breakdown.structure, 1) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC Order Block</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.poi.includes('OB') ? r.smc.poi : 'None') + '</span>' + sb(r.smc.breakdown.ob, 3) + '</div>' +
+        '<div class="frow"><span style="font-size:13px;color:#475569;min-width:110px">SMC FVG</span><span style="font-size:11px;color:#64748b;flex:1;text-align:right;padding-right:10px">' + (r.smc.breakdown.fvg !== 0 ? (r.smc.breakdown.fvg > 0 ? 'Bullish' : 'Bearish') : 'None') + '</span>' + sb(r.smc.breakdown.fvg, 1) + '</div>' +
+        '</div>' +
+        (r.smc15m ?
+          '<div class="card" id="card-step8">' +
+          '<div class="s-title">Step 8 &middot; 15M SMC Confluence</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
+          b(r.smc15m.action, r.smc15m.actionClass === 'sig-long' ? 'bg' : r.smc15m.actionClass === 'sig-short' ? 'br' : 'bn') +
+          b(r.smc15m.biasText, r.smc15m.isBullishBias ? 'bg' : 'br') +
+          b(r.smc15m.haText, r.smc15m.isHaGreen ? 'bg' : 'br') +
           '</div>' +
-          
-          '<div class="col-right">' +
-            // Step 1 - Regime Card
-            '<div class="card" id="card-step1">' +
-              '<div class="s-title">1 &middot; Regime</div>' +
-              '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + b(r.regime, regC) + '<span style="font-size:12px;color:#64748b">' + r.regAct + '</span></div>' +
-              '<div class="g3">' +
-                '<div><div class="lbl">ADX(13)</div><div class="val">' + fmt(r.curAr, 1) + '</div></div>' +
-                '<div><div class="lbl">BBW(21)</div><div class="val">' + fmt(r.curBBW, 4) + ' <span style="font-size:11px;color:#64748b">' + r.bbwState + '</span></div></div>' +
-                '<div><div class="lbl">Vol Analysis</div><div class="val">' + r.volAnalysis + '</div></div>' +
-              '</div>' +
-            '</div>' +
-            
-            // Step 2 - Toxic Flow Check Card
-            '<div class="card" id="card-step2">' +
-              '<div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
-              '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
-              '<div class="g3">' +
-                '<div><div class="lbl">EFI(13) current</div><div class="val mono">' + fmtE(r.curEFI) + '</div></div>' +
-                '<div><div class="lbl">55D mean</div><div class="val mono">' + fmtE(r.curMu) + '</div></div>' +
-                '<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">' + sigW + '</div></div>' +
-              '</div>' +
-            '</div>' +
-            
-            // Step 4 - Adverse Selection Card
-            '<div class="small-cards-grid" id="grid-steps-4-7">' +
-              '<div class="card" id="card-step4">' +
-                '<div class="s-title">4 &middot; Adverse selection</div>' +
-                '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
-                '<div class="g2">' +
-                  '<div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#64748b">/ 0.618</span></div></div>' +
-                  '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div>' +
-                '</div>' +
-              '</div>' +
-              
-              '<div class="card" id="card-step5">' +
-                '<div class="s-title">5 &middot; Volatility state</div>' +
-                '<div class="g2">' +
-                  '<div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
-                  '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div>' +
-                '</div>' +
-                '<div style="margin-top:10px;font-size:12px;color:#64748b;font-style:italic">Switch to static ATR at day 8 of hold</div>' +
-              '</div>' +
-              
-              '<div class="card" id="card-step6">' +
-                '<div class="s-title">6 &middot; Position size</div>' +
-                '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#64748b">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div>' +
-              '</div>' +
-              
-              '<div class="card" id="card-step7">' +
-                '<div class="s-title">7 &middot; 1H entry timing</div>' +
-                '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
-                '<div class="g2">' +
-                  '<div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
-                  '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
-                  '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
-                  '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div>' +
-                '</div>' +
-              '</div>' +
-            '</div>' +
+          '<div style="font-size:12px;color:#64748b;line-height:1.5;margin-bottom:12px">' + r.smc15m.actionReasoning + '</div>' +
+          '<div class="g3">' +
+          '<div><div class="lbl">OB Entry Price</div><div class="val" style="font-weight:600">$' + r.smc15m.entryPrice.toFixed(2) + '</div></div>' +
+          '<div><div class="lbl">Invalidation (SL)</div><div class="val" style="font-weight:600">$' + r.smc15m.slPrice.toFixed(2) + '</div></div>' +
+          '<div><div class="lbl">FVG Imbalance</div><div class="val" style="font-size:11px">' + r.smc15m.fvgPrice + '</div></div>' +
           '</div>' +
+          '</div>' : '') +
+        '</div>' +
+
+        '<div class="col-right">' +
+        // Step 1 - Regime Card
+        '<div class="card" id="card-step1">' +
+        '<div class="s-title">1 &middot; Regime</div>' +
+        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">' + b(r.regime, regC) + '<span style="font-size:12px;color:#64748b">' + r.regAct + '</span></div>' +
+        '<div class="g3">' +
+        '<div><div class="lbl">ADX(13)</div><div class="val">' + fmt(r.curAr, 1) + '</div></div>' +
+        '<div><div class="lbl">BBW(21)</div><div class="val">' + fmt(r.curBBW, 4) + ' <span style="font-size:11px;color:#64748b">' + r.bbwState + '</span></div></div>' +
+        '<div><div class="lbl">Vol Analysis</div><div class="val">' + r.volAnalysis + '</div></div>' +
+        '</div>' +
+        '</div>' +
+
+        // Step 2 - Toxic Flow Check Card
+        '<div class="card" id="card-step2">' +
+        '<div class="s-title">2 &middot; Toxic flow check (EFI)</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' + b(r.flow, flowC) + (r.flowMixed ? b('MIXED &mdash; 1H contradicts daily', 'bw') : '') + '</div>' +
+        '<div class="g3">' +
+        '<div><div class="lbl">EFI(13) current</div><div class="val mono">' + fmtE(r.curEFI) + '</div></div>' +
+        '<div><div class="lbl">55D mean</div><div class="val mono">' + fmtE(r.curMu) + '</div></div>' +
+        '<div><div class="lbl">&plusmn;2&sigma; width</div><div class="val mono">' + sigW + '</div></div>' +
+        '</div>' +
+        '</div>' +
+
+        // Step 4 - Adverse Selection Card
+        '<div class="small-cards-grid" id="grid-steps-4-7">' +
+        '<div class="card" id="card-step4">' +
+        '<div class="s-title">4 &middot; Adverse selection</div>' +
+        '<div style="margin-bottom:8px">' + b(r.infFlow ? 'Informed flow &mdash; reduce size' : 'None detected', infC) + '</div>' +
+        '<div class="g2">' +
+        '<div><div class="lbl">HA body ratio</div><div class="val">' + r.haBody + ' <span style="font-size:11px;color:#64748b">/ 0.618</span></div></div>' +
+        '<div><div class="lbl">ATR(5)</div><div class="val">' + fmt(r.a5) + '</div></div>' +
+        '</div>' +
+        '</div>' +
+
+        '<div class="card" id="card-step5">' +
+        '<div class="s-title">5 &middot; Volatility state</div>' +
+        '<div class="g2">' +
+        '<div><div class="lbl">BBW state</div><div class="val">' + r.bbwState + '</div></div>' +
+        '<div><div class="lbl">ATR(13)</div><div class="val">' + fmt(r.a13) + '</div></div>' +
+        '</div>' +
+        '<div style="margin-top:10px;font-size:12px;color:#64748b;font-style:italic">Switch to static ATR at day 8 of hold</div>' +
+        '</div>' +
+
+        '<div class="card" id="card-step6">' +
+        '<div class="s-title">6 &middot; Position size</div>' +
+        '<div class="sz-box">Size = (Account &times; 0.01) &divide; ' + fmt(r.a13) + ' &times; ' + r.regMult + '<br><span style="font-size:11px;color:#64748b">Kelly &gamma; 0.382 &middot; regime multiplier ' + r.regMult + '</span></div>' +
+        '</div>' +
+
+        '<div class="card" id="card-step7">' +
+        '<div class="s-title">7 &middot; 1H entry timing</div>' +
+        '<div style="margin-bottom:8px">' + b(entTxt, entC) + '</div>' +
+        '<div class="g2">' +
+        '<div><div class="lbl">1H HA color</div><div class="val">' + r.hHA + '</div></div>' +
+        '<div><div class="lbl">1H RSI(8)</div><div class="val">' + (r.hRSI != null ? r.hRSI.toFixed(1) : 'n/a') + '</div></div>' +
+        '<div><div class="lbl">1H OBV slope</div><div class="val">' + r.hOBV + '</div></div>' +
+        '<div><div class="lbl">1H EFI direction</div><div class="val">' + r.hEFIDir + '</div></div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
         '</div>';
     }
     let retryTimer = null;
