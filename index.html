@@ -593,10 +593,11 @@
       return {
         spyPrice: spy?.price, spyEMA21: spy?.ema21, spyEMA55: spy?.ema55,
         qqqPrice: qqq?.price, qqqEMA21: qqq?.ema21, qqqEMA55: qqq?.ema55,
-        iwmPrice: iwm?.price, iwmEMA21: iwm?.ema21,
-        diaPrice: dia?.price, diaEMA21: dia?.ema21,
+        iwmPrice: iwm?.price, iwmEMA21: iwm?.ema21, iwmEMA55: iwm?.ema55,
+        diaPrice: dia?.price, diaEMA21: dia?.ema21, diaEMA55: dia?.ema55,
         vix
       };
+
     }
 
     function ema(a, n) { const k = 2 / (n + 1), o = new Array(a.length).fill(null); let f = -1; for (let i = 0; i < a.length; i++) { if (a[i] == null) continue; if (f < 0) { o[i] = a[i]; f = i; continue; } if (o[i - 1] != null) o[i] = a[i] * k + o[i - 1] * (1 - k); } return o; }
@@ -801,8 +802,10 @@
       const adxV = adx(dBars, 13);
       const e21 = ema(closes, 21);
       const e55 = ema(closes, 55);
-      const trendLong = closes[L] > e21[L] && e21[L] > e55[L];
-      const trendShort = closes[L] < e21[L] && e21[L] < e55[L];
+      const pL = closes[L], e21L = e21[L], e55L = e55[L];
+
+      const trendLong = pL > e21L && e21L > e55L;
+      const trendShort = pL < e21L && e21L < e55L;
       const obvSlope = ob[L] > ob[L - 3] ? 'rising' : ob[L] < ob[L - 3] ? 'falling' : 'flat';
       const curBBW = bw[L], prvBBW = bw[L - 1];
       const bbwExp = curBBW != null && prvBBW != null && curBBW > prvBBW;
@@ -868,34 +871,64 @@
           if (flowMixed) score -= 1;
 
       const bias = score >= 4 ? 'LONG' : score <= -4 ? 'SHORT' : 'NEUTRAL';
+
+      let marketRegime = 'NEUTRAL';
+      if (bias !== 'NEUTRAL' && macro) {
+        const isLong = bias === 'LONG';
+        const spyPass = isLong ? (macro.spyPrice > macro.spyEMA21 && macro.spyEMA21 > macro.spyEMA55) : (macro.spyPrice < macro.spyEMA21 && macro.spyEMA21 < macro.spyEMA55);
+        const qqqPass = isLong ? (macro.qqqPrice > macro.qqqEMA21 && macro.qqqEMA21 > macro.qqqEMA55) : (macro.qqqPrice < macro.qqqEMA21 && macro.qqqEMA21 < macro.qqqEMA55);
+
+        if (spyPass && qqqPass) marketRegime = 'PASS';
+        else if (spyPass || qqqPass) marketRegime = 'CAUTION';
+        else marketRegime = 'FAIL';
+      }
+
       const gates = new Array(6).fill('FAIL');
       let passCount = 0;
 
       if (bias !== 'NEUTRAL') {
         const isLong = bias === 'LONG';
+
+        // Gate 1: Market Regime (Global SPY/QQQ)
+        if (marketRegime === 'PASS') { gates[0] = 'PASS'; passCount++; }
+        else if (marketRegime === 'CAUTION') { gates[0] = 'CAUTION'; }
+        else { gates[0] = 'FAIL'; }
+
         if (macro) {
-          if (isLong ? (macro.spyPrice > macro.spyEMA21 && macro.spyEMA21 > macro.spyEMA55 && macro.qqqPrice > macro.qqqEMA21 && macro.qqqEMA21 > macro.qqqEMA55) : (macro.spyPrice < macro.spyEMA21 && macro.spyEMA21 < macro.spyEMA55 && macro.qqqPrice < macro.qqqEMA21 && macro.qqqEMA21 < macro.qqqEMA55)) { gates[0] = 'PASS'; passCount++; }
-          const breadthC = [
-            (macro.spyPrice > macro.spyEMA21), (macro.qqqPrice > macro.qqqEMA21),
-            (macro.iwmPrice > macro.iwmEMA21), (macro.diaPrice > macro.diaEMA21)
-          ].filter(Boolean).length;
-          if (breadthC >= 3) { gates[1] = 'PASS'; passCount++; } else if (breadthC === 2) { gates[1] = 'CAUTION'; }
+          // Gate 2: Market Breadth
+          const breadthChecks = [
+            { name: 'SPY', pass: isLong ? macro.spyPrice > macro.spyEMA55 : macro.spyPrice < macro.spyEMA55 },
+            { name: 'QQQ', pass: isLong ? macro.qqqPrice > macro.qqqEMA55 : macro.qqqPrice < macro.qqqEMA55 },
+            { name: 'IWM', pass: isLong ? macro.iwmPrice > macro.iwmEMA55 : macro.iwmPrice < macro.iwmEMA55 },
+            { name: 'DIA', pass: isLong ? macro.diaPrice > macro.diaEMA55 : macro.diaPrice < macro.diaEMA55 },
+          ];
+          const breadthC = breadthChecks.filter(c => c.pass).length;
+          if (breadthC >= 3) { gates[1] = 'PASS'; passCount++; } else if (breadthC === 2) { gates[1] = 'CAUTION'; } else { gates[1] = 'FAIL'; }
         }
+
+        // Gate 3: SMC Structure
         if (isLong ? (smc.structure === 'bullish' && smc.lastEvent === 'BOS') : (smc.structure === 'bearish' && smc.lastEvent === 'BOS')) { gates[2] = 'PASS'; passCount++; }
         else if (smc.lastEvent === 'CHoCH') { gates[2] = 'FAIL'; }
+
+        // Gate 4: EFI/OBV
         if (isLong ? (curEFI > 0 || obvSlope === 'rising') : (curEFI < 0 || obvSlope === 'falling')) { gates[3] = 'PASS'; passCount++; }
+
+        // Gate 5: POI Proximity
         const p = dBars[L].c, b = smc.poiBounds;
         if (b.top != null && b.bot != null) {
           const dist = (p >= b.bot && p <= b.top) ? 0 : Math.min(Math.abs(p - b.top), Math.abs(p - b.bot));
           if (dist <= 0.5 * a13[L]) { gates[4] = 'PASS'; passCount++; }
         }
+
+        // Gate 6: Risk/Reward
         const target = isLong ? Math.max(...dBars.slice(Math.max(0, L - 21), L + 1).map(x => x.h)) : Math.min(...dBars.slice(Math.max(0, L - 21), L + 1).map(x => x.l));
         const stop = isLong ? (smc15m ? smc15m.slPrice : Math.min(...dBars.slice(Math.max(0, L - 5), L + 1).map(x => x.l))) : (smc15m ? smc15m.entryPrice : Math.max(...dBars.slice(Math.max(0, L - 5), L + 1).map(x => x.h)));
         if (Math.abs(target - p) / Math.abs(p - stop) >= 2) { gates[5] = 'PASS'; passCount++; }
       }
 
       let grade = 'D', risk = '0%';
-      if (passCount === 6) { grade = 'A'; risk = '1%'; }
+      if (marketRegime === 'FAIL') { grade = 'D'; risk = 'NO TRADE'; }
+      else if (passCount === 6) { grade = 'A'; risk = '1%'; }
       else if (passCount === 5) { grade = 'B'; risk = '0.5%'; }
       else if (passCount === 4) { grade = 'C'; risk = 'Watchlist'; }
       else { grade = 'D'; risk = 'NO TRADE'; }
@@ -913,12 +946,12 @@
       const range = haD[L].hh - haD[L].hl;
       const haBody = range === 0 ? 0 : (haD[L].hc - haD[L].ho) / range;
       const infFlow = haBody > 0.618 && a5[L] != null && Math.abs(dBars[L].c - dBars[L - 1].c) > a5[L];
-      const macroPass = (bias !== 'NEUTRAL') ? (gates[0] === 'PASS' && gates[1] === 'PASS') : true;
+      const macroPass = (bias !== 'NEUTRAL') ? (gates[1] === 'PASS' && gates[2] === 'PASS') : true;
       let macroReason = null;
       if (bias !== 'NEUTRAL') {
-        if (gates[0] === 'FAIL') macroReason = 'Macro trend mismatch (SPY/QQQ)';
-        else if (gates[1] === 'FAIL') macroReason = 'Insufficient market breadth';
-        else if (gates[1] === 'CAUTION') macroReason = 'Caution: Breadth is mixed';
+        if (gates[1] === 'FAIL') macroReason = 'Macro trend mismatch (SPY/QQQ)';
+        else if (gates[2] === 'FAIL') macroReason = 'Insufficient market breadth';
+        else if (gates[2] === 'CAUTION') macroReason = 'Caution: Breadth is mixed';
       }
       const vixOk = macro && macro.vix !== null ? macro.vix < 25 : true;
       const spyBull = macro ? macro.spyPrice > macro.spyEMA21 : null;
@@ -939,6 +972,8 @@
 
       return {
         regime, regAct, regMult, curAr, curBBW, bbwExp, flow, flowMixed, curEFI, curMu, curSig,
+        marketRegime,
+        gates,
         f1, f1r, f2, f2r, f3, f3r, f4, f4r, f5, f5r, score, infFlow, haBody: haBody.toFixed(3),
         signal, sigClass, a5: a5[L], a13: a13[L], bbwState: bbwExp ? 'expanding' : 'contracting',
         hHA, hRSI, hOBV, hEFIDir, entryReady, ticker, date: dBars[L].date.toLocaleDateString(),
@@ -948,7 +983,13 @@
         qqqPrice: macro ? macro.qqqPrice : null, qqqEMA: macro ? macro.qqqEMA21 : null,
         vix: macro ? macro.vix : null,
         volAnalysis, smc,
-        smc15m
+        smc15m,
+        breadthChecks: (bias !== 'NEUTRAL' && macro) ? [
+          { name: 'SPY', pass: bias === 'LONG' ? macro.spyPrice > macro.spyEMA55 : macro.spyPrice < macro.spyEMA55 },
+          { name: 'QQQ', pass: bias === 'LONG' ? macro.qqqPrice > macro.qqqEMA55 : macro.qqqPrice < macro.qqqEMA55 },
+          { name: 'IWM', pass: bias === 'LONG' ? macro.iwmPrice > macro.iwmEMA55 : macro.iwmPrice < macro.iwmEMA55 },
+          { name: 'DIA', pass: bias === 'LONG' ? macro.diaPrice > macro.diaEMA55 : macro.diaPrice < macro.diaEMA55 },
+        ] : null
       };
     }
     function b(t, c) { return '<span class="badge ' + c + '">' + t + '</span>'; }
@@ -992,22 +1033,41 @@
           '<div style="font-size:11px;font-weight:500;opacity:.65;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.05em">Signal</div>' +
           '<div class="sv">' + r.signal + '</div>' +
         '</div>' +
+        '<div class="card" style="margin-bottom:1.25rem">' +
+          '<div class="s-title">Execution Gates Checklist</div>' +
+          '<div class="g3" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr))">' +
+            [
+              'Market Regime', 'Market Breadth', 'SMC Structure', 'EFI/OBV', 'POI Prox', 'Risk/Reward'
+            ].map((name, i) => {
+              const res = r.gates[i];
+              return '<div style="display:flex;flex-direction:column;align-items:center;gap:4px">' +
+               '<span style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:600">' + name + '</span>' +
+               b(res, res === 'PASS' ? 'bg' : res === 'CAUTION' ? 'bw' : 'br') +
+               '</div>';
+            }).join('') +
+          '</div>' +
+        '</div>' +
         '<div class="dashboard-grid">' +
           '<div class="col-left">' +
             // Step 0 - Macro Gate Card
             '<div class="card" id="card-step0">' +
-              '<div class="s-title">Step 0 &middot; Macro gate</div>' +
+              '<div class="s-title">S&middot; Macro Analysis</div>' +
               '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">' +
-                b(r.macroPass === false ? 'Macro blocked' : 'Macro pass', r.macroPass === false ? 'br' : 'bg') +
-                (r.macroReason ? '<span style="font-size:12px;color:#b91c1c;margin-left:6px">' + r.macroReason + '</span>' : '') +
+                b(r.vixOk ? 'VIX Stable' : 'VIX Elevated', r.vixOk ? 'bg' : 'bw') +
               '</div>' +
               '<div class="g3">' +
                 '<div><div class="lbl">SPY vs EMA(21)</div><div class="val">' + (r.spyPrice != null ? r.spyPrice.toFixed(2) : '--') + ' ' + b(r.spyAbove === true ? 'above' : 'below', r.spyAbove === true ? 'bg' : 'br') + '</div></div>' +
                 '<div><div class="lbl">QQQ vs EMA(21)</div><div class="val">' + (r.qqqPrice != null ? r.qqqPrice.toFixed(2) : '--') + ' ' + b(r.qqqAbove === true ? 'above' : 'below', r.qqqAbove === true ? 'bg' : 'br') + '</div></div>' +
                 '<div><div class="lbl">VIX</div><div class="val">' + (r.vix != null ? r.vix.toFixed(2) : '--') + ' ' + b(r.vix != null ? (r.vix < 25 ? 'normal' : 'elevated') : '--', r.vix != null ? (r.vix < 25 ? 'bg' : 'bw') : 'bn') + '</div></div>' +
               '</div>' +
+              (r.breadthChecks ? '<div style="margin-top:12px; padding-top:12px; border-top:1px solid #f1f5f9">' +
+                '<div class="lbl" style="margin-bottom:6px">Market Breadth (EMA55)</div>' +
+                '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+                  r.breadthChecks.map(c => b(c.name, c.pass ? 'bg' : 'br')).join('') +
+                '</div>' +
+              '</div>' : '') +
             '</div>' +
-            
+
             // Step 3 - Alpha Score Card
             '<div class="card" id="card-step3">' +
               '<div class="s-title">3 &middot; Confluence</div>' +
