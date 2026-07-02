@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>综合交易策略监控系统</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f14;
+    --panel:#121821;
+    --panel2:#161d28;
+    --border:#232c3a;
+    --text:#dbe4ee;
+    --muted:#7c8aa0;
+    --green:#2fbf71;
+    --green-dim:#1c6b42;
+    --red:#e05263;
+    --red-dim:#7a2f38;
+    --amber:#e0a72f;
+    --accent:#4fa3ff;
+    --premium:rgba(224,82,99,0.08);
+    --discount:rgba(47,191,113,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;
+  }
+  header{
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+    padding:14px 18px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg, #0e131a, #0b0f14);
+    position:sticky; top:0; z-index:10;
+  }
+  header h1{font-size:16px; margin:0 16px 0 0; font-weight:600; letter-spacing:.3px; white-space:nowrap;}
+  header .sub{color:var(--muted); font-size:12px; margin-right:auto;}
+  input[type=text], input[type=password]{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    padding:7px 10px; border-radius:6px; font-size:13px; outline:none; width:120px;
+  }
+  input[type=password]{width:220px;}
+  input:focus{border-color:var(--accent);}
+  button{
+    background:var(--accent); color:#04101f; border:none; padding:8px 14px;
+    border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;
+  }
+  button:hover{filter:brightness(1.08);}
+  button.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--border);}
+  #status{font-size:12px; color:var(--muted); white-space:nowrap;}
+  #countdown{color:var(--accent); font-weight:600;}
+  main{padding:16px; display:grid; grid-template-columns:1fr; gap:16px; max-width:1400px; margin:0 auto;}
+  .grid2{display:grid; grid-template-columns:1.2fr 1fr; gap:16px;}
+  @media (max-width:1000px){ .grid2{grid-template-columns:1fr;} }
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px;
+  }
+  .panel h2{
+    font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+    margin:0 0 12px 0; display:flex; align-items:center; justify-content:space-between;
+  }
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px;
+    font-size:12px; font-weight:600;
+  }
+  .badge.green{background:rgba(47,191,113,.15); color:var(--green); border:1px solid var(--green-dim);}
+  .badge.red{background:rgba(224,82,99,.15); color:var(--red); border:1px solid var(--red-dim);}
+  .badge.amber{background:rgba(224,167,47,.15); color:var(--amber); border:1px solid #7a5f1c;}
+  .badge.gray{background:rgba(124,138,160,.12); color:var(--muted); border:1px solid var(--border);}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .dot.green{background:var(--green);}
+  .dot.red{background:var(--red);}
+  .dot.gray{background:var(--muted);}
+  .row{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .tf-cell{
+    flex:1; min-width:150px; background:var(--panel2); border:1px solid var(--border);
+    border-radius:8px; padding:12px; text-align:center;
+  }
+  .tf-cell .label{color:var(--muted); font-size:11px; text-transform:uppercase; margin-bottom:6px;}
+  .status-banner{
+    text-align:center; padding:14px; border-radius:8px; font-size:15px; font-weight:700;
+    margin-top:12px; letter-spacing:.02em;
+  }
+  .status-banner.bull{background:rgba(47,191,113,.12); color:var(--green); border:1px solid var(--green-dim);}
+  .status-banner.wait{background:rgba(224,167,47,.12); color:var(--amber); border:1px solid #7a5f1c;}
+  canvas{max-width:100%;}
+  #mainChart{width:100%; height:480px; display:block; background:var(--panel2); border-radius:8px;}
+  .legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; font-size:11px; color:var(--muted);}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .swatch{width:10px; height:10px; border-radius:2px; display:inline-block;}
+  .indicator-block{margin-bottom:18px;}
+  .indicator-block:last-child{margin-bottom:0;}
+  .mini-chart-wrap{height:130px; position:relative;}
+  .alert-line{
+    display:flex; justify-content:space-between; align-items:center; padding:8px 10px;
+    background:var(--panel2); border:1px solid var(--border); border-radius:6px; margin-top:8px; font-size:12.5px;
+  }
+  table.exec{width:100%; border-collapse:collapse; font-size:13px; margin-top:8px;}
+  table.exec th{text-align:left; color:var(--muted); font-weight:500; padding:6px 8px; border-bottom:1px solid var(--border); font-size:11px; text-transform:uppercase;}
+  table.exec td{padding:8px; border-bottom:1px solid var(--border);}
+  table.exec tr:last-child td{border-bottom:none;}
+  .kv{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--border); font-size:13px;}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{color:var(--muted);}
+  .empty-note{color:var(--muted); font-size:12.5px; line-height:1.6;}
+  .disclaimer{
+    font-size:11.5px; color:var(--muted); line-height:1.7; border-top:1px solid var(--border);
+    margin-top:10px; padding-top:10px;
+  }
+  .flag{color:var(--amber);}
+  .footer-note{text-align:center; color:var(--muted); font-size:11px; padding:20px 0 30px;}
+  ::-webkit-scrollbar{height:6px; width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--border); border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📈 综合交易策略监控系统</h1>
+  <span class="sub">Confluence Reversal Monitor · Twelve Data</span>
+  <input id="apiKey" type="password" placeholder="Twelve Data API Key">
+  <input id="symbol" type="text" placeholder="如 AAPL / EUR/USD" value="AAPL">
+  <button id="loadBtn">加载 / 刷新</button>
+  <button id="autoBtn" class="secondary">自动刷新: 关</button>
+  <span id="status">未连接</span>
+</header>
+
+<main>
+
+  <!-- SECTION 1: TREND FILTER -->
+  <div class="panel">
+    <h2>第一部分 · 全局概览与趋势过滤 <span id="tfUpdated" class="badge gray">—</span></h2>
+    <div class="row">
+      <div class="tf-cell">
+        <div class="label">日线 Heikin-Ashi</div>
+        <div id="dailyHA" class="badge gray"><span class="dot gray"></span>等待数据</div>
+      </div>
+      <div class="tf-cell">
+        <div class="label">周线 Heikin-Ashi</div>
+        <div id="weeklyHA" class="badge gray"><span class="dot gray"></span>等待数据</div>
+      </div>
+      <div class="tf-cell">
+        <div class="label">HA 动能 (haDelta, 1H)</div>
+        <div id="haDelta" class="badge gray">—</div>
+      </div>
+    </div>
+    <div id="trendStatus" class="status-banner wait">等待数据加载…</div>
+  </div>
+
+  <!-- SECTION 2: MAIN CHART -->
+  <div class="panel">
+    <h2>第二部分 · 主图表（1H Heikin-Ashi + Fibonacci + SMC）</h2>
+    <canvas id="mainChart"></canvas>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--green)"></span>看涨 HA</span>
+      <span><span class="swatch" style="background:var(--red)"></span>看跌 HA</span>
+      <span><span class="swatch" style="background:var(--amber)"></span>转折预警 (Doji)</span>
+      <span><span class="swatch" style="background:rgba(224,82,99,.35)"></span>溢价区 Premium</span>
+      <span><span class="swatch" style="background:rgba(47,191,113,.35)"></span>折价区 Discount</span>
+      <span><span class="swatch" style="background:#4fa3ff"></span>看涨 Order Block</span>
+      <span><span class="swatch" style="background:#c084fc"></span>FVG</span>
+    </div>
+    <div id="smcNotes" class="empty-note" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="grid2">
+    <!-- SECTION 3: MOMENTUM & VOLUME -->
+    <div class="panel">
+      <h2>第三部分 · 动能与容量确认</h2>
+
+      <div class="indicator-block">
+        <div class="row" style="justify-content:space-between;">
+          <strong style="font-size:12.5px; color:var(--muted);">RSI (14)</strong>
+          <span id="rsiAlert" class="badge gray">—</span>
+        </div>
+        <div class="mini-chart-wrap"><canvas id="rsiChart"></canvas></div>
+      </div>
+
+      <div class="indicator-block">
+        <div class="row" style="justify-content:space-between;">
+          <strong style="font-size:12.5px; color:var(--muted);">Stochastic RSI (%K / %D)</strong>
+          <span id="stochAlert" class="badge gray">—</span>
+        </div>
+        <div class="mini-chart-wrap"><canvas id="stochChart"></canvas></div>
+      </div>
+
+      <div class="indicator-block">
+        <div class="row" style="justify-content:space-between;">
+          <strong style="font-size:12.5px; color:var(--muted);">成交量振荡器 Volume Oscillator (5,20)</strong>
+          <span id="voAlert" class="badge gray">—</span>
+        </div>
+        <div class="mini-chart-wrap"><canvas id="voChart"></canvas></div>
+      </div>
+
+      <div id="candlevolumeNote" class="alert-line" style="display:none;"></div>
+    </div>
+
+    <!-- SECTION 4: EXECUTION & RISK -->
+    <div class="panel">
+      <h2>第四部分 · 执行与风险管理</h2>
+
+      <div id="entrySignal" class="status-banner wait">等待数据…</div>
+
+      <table class="exec">
+        <tr><th>条件</th><th>状态</th></tr>
+        <tr><td>价格处于 50%–61.8% 回撤区</td><td id="condFib">—</td></tr>
+        <tr><td>RSI 在支撑区向上卷曲</td><td id="condRsi">—</td></tr>
+        <tr><td>连续 2–3 根无下影线阳线</td><td id="condHA">—</td></tr>
+      </table>
+
+      <div class="kv"><span class="k">建议止损 (近期波动低点 − 1×ATR)</span><span id="stopLoss">—</span></div>
+      <div class="kv"><span class="k">ATR (14, 1H)</span><span id="atrVal">—</span></div>
+      <div class="kv"><span class="k">第一批入场 (50% Fib)</span><span id="entry1">—</span></div>
+      <div class="kv"><span class="k">第二批入场 (61.8% Fib / 看涨 OB)</span><span id="entry2">—</span></div>
+
+      <div class="disclaimer">
+        <span class="flag">⚠ 方法说明：</span>斐波那契波段基于最近 1H 数据窗口内自动识别的谷→峰摆动；
+        订单块 / FVG / BOS / CHoCH 为启发式规则识别，用于辅助确认，并非机构数据源标注，仅供参考，不构成投资建议。
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div class="footer-note">数据来源：Twelve Data API · 主视图周期：1H（后台同步扫描日线/周线趋势）· 每 2 分钟自动刷新</div>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  let refreshTimer = null;
+  let countdownTimer = null;
+  let secondsLeft = 120;
+  let charts = {rsi:null, stoch:null, vo:null};
+
+  // ---------- DATA FETCH ----------
+  async function fetchSeries(symbol, interval, outputsize, apiKey){
+    const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=${outputsize}&apikey=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    if(json.status === 'error' || json.code >= 400){
+      throw new Error(json.message || '数据请求失败');
+    }
+    if(!json.values) throw new Error('无有效数据返回 (可能是免费额度限制或代码错误)');
+    const rows = json.values.map(v=>({
+      time: v.datetime,
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: v.volume !== undefined ? parseFloat(v.volume) : NaN
+    })).reverse(); // oldest -> newest
+    return rows;
+  }
+
+  // ---------- INDICATOR MATH ----------
+  function computeHA(candles){
+    const out = [];
+    let prevHAOpen=null, prevHAClose=null;
+    for(let i=0;i<candles.length;i++){
+      const c = candles[i];
+      const haClose = (c.open + c.high + c.low + c.close) / 4;
+      const haOpen = (i===0) ? (c.open + c.close)/2 : (prevHAOpen + prevHAClose)/2;
+      const haHigh = Math.max(c.high, haOpen, haClose);
+      const haLow = Math.min(c.low, haOpen, haClose);
+      out.push({...c, haOpen, haHigh, haLow, haClose, haDelta: haClose - haOpen});
+      prevHAOpen = haOpen; prevHAClose = haClose;
+    }
+    return out;
+  }
+
+  function classifyHACandle(ha){
+    const body = Math.abs(ha.haClose - ha.haOpen);
+    const upperWick = ha.haHigh - Math.max(ha.haOpen, ha.haClose);
+    const lowerWick = Math.min(ha.haOpen, ha.haClose) - ha.haLow;
+    const range = ha.haHigh - ha.haLow || 1e-9;
+    const bullish = ha.haClose >= ha.haOpen;
+    const bodyRatio = body / range;
+    if(bodyRatio < 0.35 && (upperWick/range > 0.25) && (lowerWick/range > 0.25)){
+      return 'doji'; // 转折预警
+    }
+    if(bullish && lowerWick/range < 0.08 && bodyRatio > 0.6) return 'strong_bull';
+    if(!bullish && upperWick/range < 0.08 && bodyRatio > 0.6) return 'strong_bear';
+    return bullish ? 'bull' : 'bear';
+  }
+
+  function wilderRSI(closes, period=14){
+    const rsi = new Array(closes.length).fill(null);
+    if(closes.length <= period) return rsi;
+    let gainSum=0, lossSum=0;
+    for(let i=1;i<=period;i++){
+      const diff = closes[i]-closes[i-1];
+      if(diff>=0) gainSum+=diff; else lossSum-=diff;
+    }
+    let avgGain = gainSum/period, avgLoss = lossSum/period;
+    rsi[period] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+    for(let i=period+1;i<closes.length;i++){
+      const diff = closes[i]-closes[i-1];
+      const gain = diff>0?diff:0, loss = diff<0?-diff:0;
+      avgGain = (avgGain*(period-1)+gain)/period;
+      avgLoss = (avgLoss*(period-1)+loss)/period;
+      rsi[i] = avgLoss===0 ? 100 : 100 - (100/(1+(avgGain/avgLoss)));
+    }
+    return rsi;
+  }
+
+  function stochasticRSI(rsiArr, period=14, kSmooth=3, dSmooth=3){
+    const stoch = new Array(rsiArr.length).fill(null);
+    for(let i=0;i<rsiArr.length;i++){
+      if(i<period-1) continue;
+      const window = rsiArr.slice(i-period+1, i+1).filter(v=>v!==null);
+      if(window.length < period) continue;
+      const minR = Math.min(...window), maxR = Math.max(...window);
+      const cur = rsiArr[i];
+      if(cur===null) continue;
+      stoch[i] = (maxR-minR)===0 ? 0 : ((cur-minR)/(maxR-minR))*100;
+    }
+    const smooth = (arr, n)=>{
+      const out = new Array(arr.length).fill(null);
+      for(let i=0;i<arr.length;i++){
+        if(i<n-1){continue;}
+        const win = arr.slice(i-n+1,i+1).filter(v=>v!==null);
+        if(win.length<n) continue;
+        out[i] = win.reduce((a,b)=>a+b,0)/n;
+      }
+      return out;
+    };
+    const k = smooth(stoch, kSmooth);
+    const d = smooth(k, dSmooth);
+    return {k, d};
+  }
+
+  function wilderATR(candles, period=14){
+    const atr = new Array(candles.length).fill(null);
+    const trs = [];
+    for(let i=0;i<candles.length;i++){
+      if(i===0){ trs.push(candles[i].high-candles[i].low); continue; }
+      const tr = Math.max(
+        candles[i].high-candles[i].low,
+        Math.abs(candles[i].high-candles[i-1].close),
+        Math.abs(candles[i].low-candles[i-1].close)
+      );
+      trs.push(tr);
+    }
+    let avg = trs.slice(1, period+1).reduce((a,b)=>a+b,0)/period;
+    atr[period] = avg;
+    for(let i=period+1;i<candles.length;i++){
+      avg = (avg*(period-1)+trs[i])/period;
+      atr[i] = avg;
+    }
+    return atr;
+  }
+
+  function volumeOscillator(volumes, shortP=5, longP=20){
+    const sma = (arr, n, idx)=>{
+      if(idx < n-1) return null;
+      let sum=0; for(let j=idx-n+1;j<=idx;j++) sum+=arr[j];
+      return sum/n;
+    };
+    const out = new Array(volumes.length).fill(null);
+    for(let i=0;i<volumes.length;i++){
+      const s = sma(volumes, shortP, i), l = sma(volumes, longP, i);
+      if(s===null||l===null||l===0) continue;
+      out[i] = ((s-l)/l)*100;
+    }
+    return out;
+  }
+
+  function findSwing(candles, lookback=80){
+    const start = Math.max(0, candles.length-lookback);
+    const slice = candles.slice(start);
+    let lowIdx=0, low=Infinity;
+    for(let i=0;i<slice.length;i++){ if(slice[i].low<low){low=slice[i].low; lowIdx=i;} }
+    // highest high AFTER the swing low (so it represents the up-leg)
+    let highIdx=lowIdx, high=-Infinity;
+    for(let i=lowIdx;i<slice.length;i++){ if(slice[i].high>high){high=slice[i].high; highIdx=i;} }
+    return {
+      swingLow: low, swingHigh: high,
+      swingLowIdx: start+lowIdx, swingHighIdx: start+highIdx
+    };
+  }
+
+  function fibLevels(low, high){
+    const range = high-low;
+    return {
+      0: high,
+      0.382: high - range*0.382,
+      0.5: high - range*0.5,
+      0.618: high - range*0.618,
+      1: low
+    };
+  }
+
+  function detectSMC(candles){
+    // Bullish Order Block: last bearish HA candle before a run of 3+ candles that makes a new local high
+    let orderBlock = null, fvg = null, bos = null, choch = null;
+    for(let i=candles.length-6;i<candles.length-1;i++){
+      if(i<2) continue;
+      const c0 = candles[i], c1 = candles[i+1], c2 = candles[i+2];
+      if(c1 && c2 && c0.haClose < c0.haOpen){ // bearish candle
+        if(c1.haClose>c1.haOpen && c2.haClose>c2.haOpen && c2.haClose>c0.haHigh){
+          orderBlock = { idx:i, low:c0.low, high:c0.high, time:c0.time };
+        }
+      }
+    }
+    // FVG: candle i-1 high < candle i+1 low => bullish gap around candle i
+    for(let i=candles.length-15;i<candles.length-1;i++){
+      if(i<1) continue;
+      const a=candles[i-1], b=candles[i+1];
+      if(a && b && a.high < b.low){
+        fvg = { idx:i, gapLow:a.high, gapHigh:b.low, time:candles[i].time };
+      }
+    }
+    // BOS: close breaks above the highest high of the prior N candles (excluding current)
+    const N=20;
+    for(let i=candles.length-10;i<candles.length;i++){
+      if(i<N) continue;
+      const priorHigh = Math.max(...candles.slice(i-N,i).map(c=>c.high));
+      if(candles[i].close > priorHigh){ bos = { idx:i, level:priorHigh, time:candles[i].time }; }
+    }
+    // CHoCH: after a local downtrend (lower highs), close breaks above the most recent minor swing high
+    for(let i=candles.length-10;i<candles.length;i++){
+      if(i<10) continue;
+      const window = candles.slice(i-10,i);
+      const minorHighIdx = window.reduce((best,c,idx)=> c.high>window[best].high?idx:best,0);
+      const minorHigh = window[minorHighIdx].high;
+      const trendingDown = window[0].high > window[window.length-1].high;
+      if(trendingDown && candles[i].close > minorHigh){
+        choch = { idx:i, level:minorHigh, time:candles[i].time };
+      }
+    }
+    return {orderBlock, fvg, bos, choch};
+  }
+
+  // ---------- MAIN CHART RENDERING (canvas) ----------
+  function drawMainChart(candles, fib, smc){
+    const canvas = $('mainChart');
+    const dpr = window.devicePixelRatio || 1;
+    const cssWidth = canvas.parentElement.clientWidth - 32;
+    const cssHeight = 480;
+    canvas.style.width = cssWidth+'px';
+    canvas.style.height = cssHeight+'px';
+    canvas.width = cssWidth*dpr;
+    canvas.height = cssHeight*dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,cssWidth,cssHeight);
+
+    const padL=60, padR=20, padT=20, padB=30;
+    const plotW = cssWidth-padL-padR, plotH = cssHeight-padT-padB;
+    const n = candles.length;
+    const allHigh = Math.max(...candles.map(c=>c.haHigh), fib[0]);
+    const allLow = Math.min(...candles.map(c=>c.haLow), fib[1]);
+    const pad = (allHigh-allLow)*0.05;
+    const yMax = allHigh+pad, yMin = allLow-pad;
+    const yToPx = (v)=> padT + (1-(v-yMin)/(yMax-yMin))*plotH;
+    const xStep = plotW/n;
+    const xToPx = (i)=> padL + i*xStep + xStep/2;
+
+    // premium/discount shading, split at 50% fib
+    const mid = fib[0.5];
+    ctx.fillStyle = 'rgba(224,82,99,0.06)';
+    ctx.fillRect(padL, padT, plotW, yToPx(mid)-padT);
+    ctx.fillStyle = 'rgba(47,191,113,0.06)';
+    ctx.fillRect(padL, yToPx(mid), plotW, (padT+plotH)-yToPx(mid));
+
+    // fib lines
+    const fibColors = {0:'#7c8aa0', 0.382:'#4fa3ff', 0.5:'#e0a72f', 0.618:'#4fa3ff', 1:'#7c8aa0'};
+    Object.keys(fib).forEach(k=>{
+      const y = yToPx(fib[k]);
+      ctx.strokeStyle = fibColors[k]||'#7c8aa0';
+      ctx.setLineDash(k==0.5?[]:[4,4]);
+      ctx.lineWidth = k==0.5?1.5:1;
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+plotW,y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = fibColors[k]||'#7c8aa0';
+      ctx.font='11px sans-serif';
+      ctx.fillText(`${(k*100).toFixed(1)}%  ${fib[k].toFixed(4)}`, padL+plotW-140, y-3);
+    });
+
+    // order block zone
+    if(smc.orderBlock){
+      const y1=yToPx(smc.orderBlock.high), y2=yToPx(smc.orderBlock.low);
+      ctx.fillStyle='rgba(79,163,255,0.18)';
+      ctx.fillRect(padL, y1, plotW, y2-y1);
+      ctx.fillStyle='#4fa3ff'; ctx.font='10px sans-serif';
+      ctx.fillText('Bullish OB', padL+4, y1-2);
+    }
+    // FVG zone
+    if(smc.fvg){
+      const y1=yToPx(smc.fvg.gapHigh), y2=yToPx(smc.fvg.gapLow);
+      ctx.fillStyle='rgba(192,132,252,0.18)';
+      ctx.fillRect(padL, y1, plotW, y2-y1);
+      ctx.fillStyle='#c084fc'; ctx.font='10px sans-serif';
+      ctx.fillText('FVG', padL+4, y1-2);
+    }
+
+    // candles (Heikin-Ashi)
+    const bodyW = Math.max(2, xStep*0.6);
+    candles.forEach((c,i)=>{
+      const x = xToPx(i);
+      const type = classifyHACandle(c);
+      let color = c.haClose>=c.haOpen ? '#2fbf71' : '#e05263';
+      if(type==='doji') color = '#e0a72f';
+      ctx.strokeStyle = color; ctx.fillStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, yToPx(c.haHigh));
+      ctx.lineTo(x, yToPx(c.haLow));
+      ctx.stroke();
+      const yOpen = yToPx(c.haOpen), yClose = yToPx(c.haClose);
+      const top = Math.min(yOpen,yClose), h = Math.max(1, Math.abs(yClose-yOpen));
+      ctx.fillRect(x-bodyW/2, top, bodyW, h);
+    });
+
+    // BOS / CHoCH markers
+    function markEvent(ev, label, color){
+      if(!ev) return;
+      const x = xToPx(ev.idx), y = yToPx(ev.level!==undefined?ev.level:candles[ev.idx].close);
+      ctx.strokeStyle=color; ctx.setLineDash([2,3]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(padL+plotW,y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle=color; ctx.font='10px sans-serif';
+      ctx.fillText(label, x, y-6);
+    }
+    markEvent(smc.bos, 'BOS', '#4fa3ff');
+    markEvent(smc.choch, 'CHoCH', '#e0a72f');
+
+    // x-axis time labels (sparse)
+    ctx.fillStyle='#7c8aa0'; ctx.font='10px sans-serif';
+    const labelEvery = Math.max(1, Math.floor(n/8));
+    candles.forEach((c,i)=>{
+      if(i%labelEvery===0){
+        const x = xToPx(i);
+        const label = c.time.slice(5,16).replace('T',' ');
+        ctx.fillText(label, x-25, cssHeight-8);
+      }
+    });
+  }
+
+  function renderMiniLineChart(ctxId, labels, series, opts={}){
+    if(charts[ctxId]) charts[ctxId].destroy();
+    const ctx = $(opts.canvasId).getContext('2d');
+    charts[ctxId] = new Chart(ctx, {
+      type: opts.type||'line',
+      data: { labels, datasets: series },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        animation:false,
+        scales:{
+          x:{display:false},
+          y:{ ticks:{color:'#7c8aa0', font:{size:10}}, grid:{color:'#1c2430'}, min:opts.min, max:opts.max }
+        },
+        plugins:{ legend:{display: !!opts.legend, labels:{color:'#9fb0c4', font:{size:10}}} }
+      }
+    });
+  }
+
+  // ---------- ORCHESTRATION ----------
+  async function loadAll(){
+    const apiKey = $('apiKey').value.trim();
+    const symbol = $('symbol').value.trim();
+    if(!apiKey){ setStatus('请输入 Twelve Data API Key', true); return; }
+    if(!symbol){ setStatus('请输入交易品种代码', true); return; }
+    setStatus('数据加载中…');
+    try{
+      const [daily, weekly, hourly] = await Promise.all([
+        fetchSeries(symbol,'1day',60,apiKey),
+        fetchSeries(symbol,'1week',60,apiKey),
+        fetchSeries(symbol,'1h',150,apiKey)
+      ]);
+      processAndRender(daily, weekly, hourly, symbol);
+      setStatus(`已更新 · ${symbol} · ${new Date().toLocaleTimeString()}`);
+    }catch(err){
+      setStatus('错误: '+err.message, true);
+      console.error(err);
+    }
+  }
+
+  function setStatus(msg, isError){
+    $('status').textContent = msg;
+    $('status').style.color = isError ? 'var(--red)' : 'var(--muted)';
+  }
+
+  function badgeHTML(color, text){
+    return `<span class="dot ${color}"></span>${text}`;
+  }
+
+  function processAndRender(dailyRaw, weeklyRaw, hourlyRaw, symbol){
+    const daily = computeHA(dailyRaw);
+    const weekly = computeHA(weeklyRaw);
+    const hourly = computeHA(hourlyRaw);
+
+    // ---- Section 1: trend filter ----
+    const lastDaily = daily[daily.length-1];
+    const lastWeekly = weekly[weekly.length-1];
+    const dailyBull = lastDaily.haClose >= lastDaily.haOpen;
+    const weeklyBull = lastWeekly.haClose >= lastWeekly.haOpen;
+
+    $('dailyHA').innerHTML = badgeHTML(dailyBull?'green':'red', dailyBull?'绿色 · 看涨':'红色 · 看跌');
+    $('dailyHA').className = 'badge '+(dailyBull?'green':'red');
+    $('weeklyHA').innerHTML = badgeHTML(weeklyBull?'green':'red', weeklyBull?'绿色 · 看涨':'红色 · 看跌');
+    $('weeklyHA').className = 'badge '+(weeklyBull?'green':'red');
+
+    const lastHourly = hourly[hourly.length-1];
+    const deltaPositive = lastHourly.haDelta >= 0;
+    $('haDelta').innerHTML = `${deltaPositive?'▲':'▼'} ${lastHourly.haDelta.toFixed(5)}`;
+    $('haDelta').className = 'badge '+(deltaPositive?'green':'red');
+
+    $('tfUpdated').textContent = new Date().toLocaleTimeString();
+
+    const trendBanner = $('trendStatus');
+    if(dailyBull && weeklyBull){
+      trendBanner.textContent = '✅ 强多头背景 (日线 + 周线一致看涨)';
+      trendBanner.className = 'status-banner bull';
+    } else {
+      trendBanner.textContent = '⏸ 观望 / 调整中 (日线与周线趋势不一致)';
+      trendBanner.className = 'status-banner wait';
+    }
+
+    // ---- Section 2: main chart, fib, SMC ----
+    const swing = findSwing(hourly, 80);
+    const fib = fibLevels(swing.swingLow, swing.swingHigh);
+    const smc = detectSMC(hourly);
+    drawMainChart(hourly, fib, smc);
+
+    const smcNotesArr = [];
+    smcNotesArr.push(`最近波段: 低点 ${swing.swingLow.toFixed(4)} → 高点 ${swing.swingHigh.toFixed(4)}`);
+    smcNotesArr.push(smc.orderBlock ? `看涨订单块区间: ${smc.orderBlock.low.toFixed(4)} – ${smc.orderBlock.high.toFixed(4)}` : '未检测到明显看涨订单块');
+    smcNotesArr.push(smc.fvg ? `FVG 区间: ${smc.fvg.gapLow.toFixed(4)} – ${smc.fvg.gapHigh.toFixed(4)}` : '未检测到明显 FVG');
+    smcNotesArr.push(smc.bos ? `检测到结构突破 BOS，突破位 ${smc.bos.level.toFixed(4)}` : '暂无近期 BOS 信号');
+    smcNotesArr.push(smc.choch ? `检测到性质改变 CHoCH，参考位 ${smc.choch.level.toFixed(4)}` : '暂无近期 CHoCH 信号');
+    $('smcNotes').innerHTML = smcNotesArr.join(' · ');
+
+    // ---- Section 3: momentum & volume ----
+    const closes = hourly.map(c=>c.close);
+    const volumes = hourly.map(c=>isNaN(c.volume)?0:c.volume);
+    const rsi = wilderRSI(closes,14);
+    const {k: stochK, d: stochD} = stochasticRSI(rsi,14,3,3);
+    const vo = volumeOscillator(volumes,5,20);
+    const atr = wilderATR(hourly,14);
+
+    const labels = hourly.map(c=>c.time.slice(5,16));
+    renderMiniLineChart('rsi', labels, [
+      {label:'RSI', data:rsi, borderColor:'#4fa3ff', pointRadius:0, borderWidth:1.5, tension:0.15},
+    ], {canvasId:'rsiChart', min:0, max:100});
+    renderMiniLineChart('stoch', labels, [
+      {label:'%K', data:stochK, borderColor:'#2fbf71', pointRadius:0, borderWidth:1.5, tension:0.15},
+      {label:'%D', data:stochD, borderColor:'#e0a72f', pointRadius:0, borderWidth:1.5, tension:0.15},
+    ], {canvasId:'stochChart', min:0, max:100, legend:true});
+    renderMiniLineChart('vo', labels, [
+      {label:'VO %', data:vo, borderColor:'#c084fc', pointRadius:0, borderWidth:1.5, tension:0.15},
+    ], {canvasId:'voChart'});
+
+    // RSI double-bottom / curl-up near fib support (heuristic over last 10 bars)
+    const recentRSI = rsi.slice(-10).filter(v=>v!==null);
+    let rsiCurlUp = false, rsiDoubleBottom = false;
+    if(recentRSI.length>=4){
+      const lastVals = recentRSI.slice(-4);
+      rsiCurlUp = lastVals[lastVals.length-1] > lastVals[lastVals.length-2] && lastVals[lastVals.length-2] <= lastVals[lastVals.length-3];
+      const localMinima = [];
+      for(let i=1;i<recentRSI.length-1;i++){
+        if(recentRSI[i]<recentRSI[i-1] && recentRSI[i]<recentRSI[i+1]) localMinima.push(recentRSI[i]);
+      }
+      if(localMinima.length>=2){
+        rsiDoubleBottom = Math.abs(localMinima[localMinima.length-1]-localMinima[localMinima.length-2]) < 5 && localMinima[localMinima.length-1] < 45;
+      }
+    }
+    $('rsiAlert').innerHTML = rsiDoubleBottom ? '双底形态' : (rsiCurlUp ? '向上卷曲' : '无信号');
+    $('rsiAlert').className = 'badge ' + (rsiDoubleBottom||rsiCurlUp ? 'green':'gray');
+
+    // Stoch RSI golden cross below 25
+    const lastK = stochK[stochK.length-1], prevK = stochK[stochK.length-2];
+    const lastD = stochD[stochD.length-1], prevD = stochD[stochD.length-2];
+    let stochGoldenCross = false;
+    if([lastK,prevK,lastD,prevD].every(v=>v!==null&&v!==undefined)){
+      stochGoldenCross = prevK<=prevD && lastK>lastD && lastK<25;
+    }
+    $('stochAlert').innerHTML = stochGoldenCross ? '⚡ 25以下金叉' : '无信号';
+    $('stochAlert').className = 'badge ' + (stochGoldenCross?'green':'gray');
+
+    // Volume oscillator slope description
+    const lastVO = vo[vo.length-1], vo5ago = vo[vo.length-6];
+    let voRising = false;
+    if(lastVO!==null && vo5ago!==null){ voRising = lastVO > vo5ago; }
+    $('voAlert').innerHTML = voRising ? '斜率上升 (动能回归)' : '斜率下降/持平 (风暴过去)';
+    $('voAlert').className = 'badge ' + (voRising?'green':'gray');
+
+    // Candlevolume note: wide HA body + high volume = institutional entry candle
+    const last3 = hourly.slice(-3);
+    const avgVol = volumes.slice(-20).reduce((a,b)=>a+b,0)/Math.max(1,volumes.slice(-20).length);
+    const wideWithVolume = last3.find(c => Math.abs(c.haClose-c.haOpen) > 0 && !isNaN(c.volume) && c.volume > avgVol*1.5 && classifyHACandle(c)==='strong_bull');
+    const cvNote = $('candlevolumeNote');
+    if(wideWithVolume){
+      cvNote.style.display='flex';
+      cvNote.innerHTML = `<span>🏛 检测到"又长又宽"机构进场K线</span><span>${wideWithVolume.time.slice(0,16)}</span>`;
+    } else {
+      cvNote.style.display='none';
+    }
+
+    // ---- Section 4: execution & risk ----
+    const currentPrice = hourly[hourly.length-1].close;
+    const inFibZone = currentPrice <= fib[0.5] + (fib[0]-fib[1])*0.02 && currentPrice >= fib[0.618] - (fib[0]-fib[1])*0.02;
+    const rsiConditionMet = rsiCurlUp || rsiDoubleBottom;
+
+    const last3HA = hourly.slice(-3).map(classifyHACandle);
+    const consecGreenNoLowerWick = last3HA.filter(t=>t==='strong_bull').length >= 2;
+
+    $('condFib').innerHTML = inFibZone ? '<span class="badge green">满足</span>' : '<span class="badge gray">未满足</span>';
+    $('condRsi').innerHTML = rsiConditionMet ? '<span class="badge green">满足</span>' : '<span class="badge gray">未满足</span>';
+    $('condHA').innerHTML = consecGreenNoLowerWick ? '<span class="badge green">满足</span>' : '<span class="badge gray">未满足</span>';
+
+    const allConditionsMet = inFibZone && rsiConditionMet && consecGreenNoLowerWick;
+    const entryBanner = $('entrySignal');
+    if(allConditionsMet){
+      entryBanner.textContent = '🎯 入场信号触发：三项条件汇合确认';
+      entryBanner.className = 'status-banner bull';
+    } else {
+      entryBanner.textContent = '⏳ 条件未完全汇合，继续观察';
+      entryBanner.className = 'status-banner wait';
+    }
+
+    const lastATR = [...atr].reverse().find(v=>v!==null) || null;
+    $('atrVal').textContent = lastATR ? lastATR.toFixed(5) : '[Insufficient data, unable to confirm]';
+
+    if(lastATR){
+      const stop = swing.swingLow - lastATR;
+      $('stopLoss').textContent = stop.toFixed(5);
+    } else {
+      $('stopLoss').textContent = '[Insufficient data, unable to confirm]';
+    }
+
+    $('entry1').textContent = fib[0.5].toFixed(5) + ' (50% Fib)';
+    $('entry2').textContent = smc.orderBlock
+      ? `${fib[0.618].toFixed(5)} (61.8% Fib) / OB ${smc.orderBlock.low.toFixed(4)}–${smc.orderBlock.high.toFixed(4)}`
+      : `${fib[0.618].toFixed(5)} (61.8% Fib)`;
+  }
+
+  // ---------- AUTO REFRESH ----------
+  function startAutoRefresh(){
+    stopAutoRefresh();
+    secondsLeft = 120;
+    $('autoBtn').textContent = '自动刷新: 开';
+    countdownTimer = setInterval(()=>{
+      secondsLeft--;
+      setStatus(`自动刷新中 · 下次刷新: ${secondsLeft}s`);
+      if(secondsLeft<=0){ secondsLeft=120; loadAll(); }
+    },1000);
+  }
+  function stopAutoRefresh(){
+    clearInterval(countdownTimer);
+    countdownTimer=null;
+    $('autoBtn').textContent = '自动刷新: 关';
+  }
+
+  $('loadBtn').addEventListener('click', loadAll);
+  $('autoBtn').addEventListener('click', ()=>{
+    if(countdownTimer) stopAutoRefresh(); else startAutoRefresh();
+  });
+  $('symbol').addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadAll(); });
+  window.addEventListener('resize', ()=>{ /* chart redraws on next load */ });
+
+})();
+</script>
+</body>
+</html>
